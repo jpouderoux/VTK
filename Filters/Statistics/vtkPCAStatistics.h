@@ -133,6 +133,11 @@ public:
   virtual void SetSpecifiedNormalization( vtkTable* );
 
   // Description:
+  // Set the quantiles table to compute robust PCA using medians instead of means.
+  virtual vtkTable* GetQuantiles();
+  virtual void SetQuantiles( vtkTable* normSpec );
+
+  // Description:
   // Get the eigenvalues. The eigenvalues are ordered according from largest to smallest.
   // This function:
   // void GetEigenvalues(int request, int i, vtkDoubleArray*);

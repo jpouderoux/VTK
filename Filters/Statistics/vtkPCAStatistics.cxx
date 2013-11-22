@@ -198,17 +198,20 @@ class vtkPCAAssessFunctor : public vtkMultiCorrelativeAssessFunctor
 public:
   static vtkPCAAssessFunctor* New();
 
-  vtkPCAAssessFunctor() { }
-  virtual ~vtkPCAAssessFunctor() { }
+  vtkPCAAssessFunctor() { this->Parent = 0; this->Median = 0; }
+  virtual ~vtkPCAAssessFunctor() { if (this->Median) { this->Median->Delete(); } }
   virtual bool InitializePCA(
                              vtkTable* inData, vtkTable* reqModel,
                              int normScheme, int basisScheme, int basisSize, double basisEnergy );
 
   virtual void operator () ( vtkVariantArray* result, vtkIdType row );
+  void SetParent(vtkPCAStatistics* parent) { this->Parent = parent; }
 
   std::vector<double> EigenValues;
   std::vector<std::vector<double> > EigenVectors;
   vtkIdType BasisSize;
+  vtkPCAStatistics* Parent;
+  vtkDoubleArray *Median;
 };
 
 // ----------------------------------------------------------------------
@@ -241,6 +244,21 @@ bool vtkPCAAssessFunctor::InitializePCA( vtkTable* inData,
     return false;
     }
 
+  this->Median = 0;
+  if ( vtkTable* quantiles = this->Parent->GetQuantiles() )
+    {
+    this->Median = vtkDoubleArray::New();
+    this->Median->SetNumberOfComponents(1);
+    vtkIdType nbcol = quantiles->GetNumberOfColumns() - 1;
+    this->Median->SetNumberOfValues( quantiles->GetNumberOfColumns() );    
+    for ( vtkIdType i = 0; i < nbcol; i++ )
+      {
+      this->Median->SetValue( i, quantiles->GetValue(2, i+1).ToDouble() );      
+      }
+    
+    this->Center = this->Median->GetPointer( 0 );    
+    }
+  
   // Check that the derived model includes additional rows specifying the
   // normalization as required.
   vtkIdType mrmr = reqModel->GetNumberOfRows(); // actual number of rows
@@ -283,7 +301,7 @@ bool vtkPCAAssessFunctor::InitializePCA( vtkTable* inData,
   double eigSum = 0.;
   for ( i = 0; i < m; ++ i )
     {
-    double eigVal = evalm->GetValue( m + 1 + i );
+    double eigVal = evalm->GetValue( m + 1 + i );   
     eigSum += eigVal;
     this->EigenValues.push_back( eigVal );
     }
@@ -331,6 +349,7 @@ bool vtkPCAAssessFunctor::InitializePCA( vtkTable* inData,
       }
     this->EigenVectors.push_back( evec );
     }
+
   return true;
 }
 
@@ -362,7 +381,7 @@ void vtkPCAAssessFunctor::operator () ( vtkVariantArray* result, vtkIdType row )
 // ======================================================== vtkPCAStatistics
 vtkPCAStatistics::vtkPCAStatistics()
 {
-  this->SetNumberOfInputPorts( 4 ); // last port is for normalization coefficients.
+  this->SetNumberOfInputPorts( 5 ); // last port is for normalization coefficients.
   this->NormalizationScheme = NONE;
   this->BasisScheme = FULL_BASIS;
   this->FixedBasisSize = -1;
@@ -444,6 +463,16 @@ void vtkPCAStatistics::SetNormalizationSchemeByName( const char* schemeName )
   vtkErrorMacro( "Invalid normalization scheme name \"" << schemeName << "\" provided." );
 }
 
+// ----------------------------------------------------------------------
+vtkTable* vtkPCAStatistics::GetQuantiles()
+{
+  return vtkTable::SafeDownCast( this->GetInputDataObject( 4, 0 ) );
+}
+
+void vtkPCAStatistics::SetQuantiles( vtkTable* normSpec )
+{
+  this->SetInputData( 4, normSpec );
+}
 
 // ----------------------------------------------------------------------
 vtkTable* vtkPCAStatistics::GetSpecifiedNormalization()
@@ -483,7 +512,7 @@ void vtkPCAStatistics::SetBasisSchemeByName( const char* schemeName )
 // ----------------------------------------------------------------------
 int vtkPCAStatistics::FillInputPortInformation( int port, vtkInformation* info )
 {
-  if ( port == 3 )
+  if ( port == 3 || port == 4 )
     {
     info->Set( vtkAlgorithm::INPUT_REQUIRED_DATA_TYPE(), "vtkTable" );
     info->Set( vtkAlgorithm::INPUT_IS_OPTIONAL(), 1 );
@@ -802,7 +831,7 @@ void vtkPCAStatistics::Test( vtkTable* inData,
     {
     return;
     }
-
+  
   // Prepare columns for the test:
   // 0: (derived) model block index
   // 1: multivariate Srivastava skewness
@@ -1076,6 +1105,7 @@ void vtkPCAStatistics::SelectAssessFunctor( vtkTable* inData,
     }
 
   vtkPCAAssessFunctor* pcafunc = vtkPCAAssessFunctor::New();
+  pcafunc->SetParent(this);
   if ( ! pcafunc->InitializePCA(
                                 inData, reqModel, this->NormalizationScheme,
                                 this->BasisScheme, this->FixedBasisSize, this->FixedBasisEnergy ) )

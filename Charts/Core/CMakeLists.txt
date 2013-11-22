@@ -7,7 +7,7 @@ set(Module_SRCS
   vtkChartLegend.cxx
   vtkChartMatrix.cxx
   vtkChartParallelCoordinates.cxx
-  vtkChartPie.cxx
+  vtkChartPie.cxx  
   vtkChartXY.cxx
   vtkChartXYZ.cxx
   vtkColorLegend.cxx
@@ -23,7 +23,9 @@ set(Module_SRCS
   vtkPiecewisePointHandleItem.cxx
   vtkPlot.cxx
   vtkPlot3D.cxx
+  vtkPlotBag.cxx
   vtkPlotBar.cxx
+  vtkPlotBox.cxx
   vtkPlotGrid.cxx
   vtkPlotHistogram2D.cxx
   vtkPlotLine.cxx

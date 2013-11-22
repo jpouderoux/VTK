@@ -51,7 +51,10 @@ public:
     LINE,
     POINTS,
     BAR,
-    STACKED};
+    STACKED,
+    BOX,
+    BAG
+    };
 
   // Description:
   // Enum of valid chart action types.
