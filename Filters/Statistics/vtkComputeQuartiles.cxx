@@ -134,25 +134,25 @@ int vtkComputeQuartiles::RequestData(vtkInformation* /*request*/,
   vtkDataObject *input = inInfo->Get(vtkDataObject::DATA_OBJECT());  
   vtkTable* outputTable = vtkTable::GetData(outputVector, 0);
   
-  // Initialize output table
-  vtkNew<vtkStringArray> attributeName;
-  attributeName->SetName("Attribute Name");
-  outputTable->AddColumn(attributeName.GetPointer());
-  vtkNew<vtkDoubleArray> q[5];
-  for (int i = 0; i < 5; i++)
-    {
-    std::stringstream ss;
-    ss << "q" << i;
-    q[i]->SetName(ss.str().c_str());
-    outputTable->AddColumn(q[i].GetPointer());
-    }
+  //// Initialize output table
+  //vtkNew<vtkStringArray> attributeName;
+  //attributeName->SetName("Attribute Name");
+  //outputTable->AddColumn(attributeName.GetPointer());
+  //vtkNew<vtkDoubleArray> q[5];
+  //for (int i = 0; i < 5; i++)
+  //  {
+  //  std::stringstream ss;
+  //  ss << "q" << i;
+  //  q[i]->SetName(ss.str().c_str());
+  //  outputTable->AddColumn(q[i].GetPointer());
+  //  }
   
   vtkCompositeDataSet *cdin = vtkCompositeDataSet::SafeDownCast(input);
   if (cdin)
     {
-    vtkNew<vtkIdTypeArray> blockId;
+    /*vtkNew<vtkIdTypeArray> blockId;
     blockId->SetName("Block");
-    outputTable->AddColumn(blockId.GetPointer());
+    outputTable->AddColumn(blockId.GetPointer());*/
     vtkCompositeDataIterator* iter = cdin->NewIterator();
     for (iter->InitTraversal(); !iter->IsDoneWithTraversal(); iter->GoToNextItem())
       {
@@ -199,7 +199,7 @@ void vtkComputeQuartiles::ComputeTable(vtkDataObject* input,
 
     // If field doesn't have a name, give a default one
     if (!dataArray->GetName())
-      {      
+      {
       std::ostringstream s;
       s << "Field " << i;
       dataArray->SetName(s.str().c_str());
@@ -231,26 +231,44 @@ void vtkComputeQuartiles::ComputeTable(vtkDataObject* input,
     return;
     } 
 
-  vtkIdType currLen = outputTable->GetNumberOfRows();
+  vtkIdType currLen = outputTable->GetNumberOfColumns();
   vtkIdType outLen = outputQuartiles->GetNumberOfColumns() - 1;
 
-  // Resize the output len with the new row
-  for (int i = 0; i < outputTable->GetNumberOfColumns(); i++)
-    {
-    vtkAbstractArray* da = outputTable->GetColumn(i);
-    da->Resize(currLen + outLen);
-    da->SetNumberOfTuples(currLen + outLen);
-    }
+  //// Resize the output len with the new row
+  //for (int i = 0; i < outputTable->GetNumberOfColumns(); i++)
+  //  {
+  //  vtkAbstractArray* da = outputTable->GetColumn(i);
+  //  da->Resize(currLen + outLen);
+  //  da->SetNumberOfTuples(currLen + outLen);
+  //  }
 
   // Fill the table
   for (int j = 0; j < outLen; j++)
     {
     inDescStats->GetColumnName(j);
-    outputTable->SetValue(currLen + j, 0, inDescStats->GetColumnName(j));
+
+    //outputTable->SetValue(0, currLen + j, 0, inDescStats->GetColumnName(j));
     vtkAbstractArray *col = outputQuartiles->GetColumnByName(inDescStats->GetColumnName(j));
+    vtkNew<vtkDoubleArray> ncol;
+    ncol->SetName(inDescStats->GetColumnName(j));
+    ncol->SetNumberOfComponents(1);
+    ncol->SetNumberOfValues(5);
+    outputTable->AddColumn(ncol.GetPointer());
+    if (blockId >= 0)
+      {
+      std::stringstream ss;
+      ss << inDescStats->GetColumnName(j) << "_block_" << blockId;
+      outputTable->SetValue(currLen + j, 6, blockId);
+      ncol->SetName(ss.str().c_str());
+      }
+    else
+      {
+      ncol->SetName(inDescStats->GetColumnName(j));
+      }
+
     for (int k = 0; k < 5; k++)
       {
-      outputTable->SetValue(currLen + j, k + 1, col ? col->GetVariantValue(k).ToDouble() : 0.0);
+      outputTable->SetValue(k, currLen + j, col ? col->GetVariantValue(k).ToDouble() : 0.0);
       }
 
     if (blockId >= 0)

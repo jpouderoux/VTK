@@ -13,10 +13,8 @@
 
 =========================================================================*/
 
-// .NAME vtkPlotBox - Class for drawing an a box plot given six columns from
-// a vtkTable. Each row of the input table will represent a box. This class
-// doesn't compute the quartiles of a data series but directly use them from
-// the input tables to display boxes of the vtkPlotBox.
+// .NAME vtkPlotBox - Class for drawing an XY line plot given two columns from
+// a vtkTable.
 //
 // .SECTION Description
 //
@@ -25,23 +23,23 @@
 #define __vtkPlotBox_h
 
 #include "vtkChartsCoreModule.h" // For export macro
-#include "vtkPlot.h"
+#include "vtkPlotPoints.h"
 
-class vtkContext2D;
-class vtkTable;
-class vtkDataArray;
-class vtkStdString;
-
-
-class VTKCHARTSCORE_EXPORT vtkPlotBox : public vtkPlot
+class VTKCHARTSCORE_EXPORT vtkPlotBox : public vtkPlotPoints
 {
 public:
-  vtkTypeMacro(vtkPlotBox, vtkPlot);
+  vtkTypeMacro(vtkPlotBox, vtkPlotPoints);
   virtual void PrintSelf(ostream &os, vtkIndent indent);
 
   // Description:
   // Creates a 2D Chart object.
   static vtkPlotBox *New();
+
+  // Description:
+  // Perform any updates to the item that may be necessary before rendering.
+  // The scene should take care of calling this on all items before their
+  // Paint function is invoked.
+  virtual void Update();
 
   // Description:
   // Paint event for the XY plot, called whenever the chart needs to be drawn.
@@ -56,32 +54,12 @@ public:
                            int legendIndex);
 
   // Description:
-  // Get the bounds for this box plot as (Xmin, Xmax, Ymin, Ymax).
+  // Get the bounds for this plot as (Xmin, Xmax, Ymin, Ymax).
   virtual void GetBounds(double bounds[4]);
 
   // Description:
-  // Set the input, we are expecting a vtkTable with six columns. The first
-  // column represents the x position of a displayed box. The five others
-  // columns represent the quartiles used to display the box.
-  // Inherited method will call the last SetInputData method with default
-  // paramaters.
-  virtual void SetInputData(vtkTable *table);
-  virtual void SetInputData(vtkTable *table, const vtkStdString &xColumn,
-                            const vtkStdString &yColumn);
-  virtual void SetInputData(vtkTable *table, const vtkStdString &xColumn,
-                            const vtkStdString &q0Column,
-                            const vtkStdString &q1Column,
-                            const vtkStdString &q2Column,
-                            const vtkStdString &q3Column,
-                            const vtkStdString &q4Column);
-
-  void SetInputData(vtkTable *table, vtkIdType &xColumn,
-                    vtkIdType &q0Column,
-                    vtkIdType &q1Column,
-                    vtkIdType &q2Column,
-                    vtkIdType &q3Column,
-                    vtkIdType &q4Column);
-
+  // Get the non-log-scaled bounds on chart inputs for this plot as (Xmin, Xmax, Ymin, Ymax).
+  virtual void GetUnscaledInputBounds(double bounds[4]);
 
   // Description:
   // Set the width of the box.
@@ -90,23 +68,20 @@ public:
   // Description:
   // Get the width of the box.
   vtkGetMacro(BoxWidth, float);
-
-  //BTX
+  
+//BTX
 protected:
   vtkPlotBox();
   ~vtkPlotBox();
-
+  
   float BoxWidth;
-
-  // Description:
-  // The point cache is marked dirty until it has been initialized.
-  vtkTimeStamp BuildTime;
+  int Position;
 
 private:
   vtkPlotBox(const vtkPlotBox &); // Not implemented.
   void operator=(const vtkPlotBox &); // Not implemented.
 
-  //ETX
+//ETX
 };
 
-#endif //__vtkPlotBox_h
+#endif //__vtkPlotLine_h

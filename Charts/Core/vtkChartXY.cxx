@@ -1145,14 +1145,8 @@ void vtkChartXY::ClearPlots()
 //-----------------------------------------------------------------------------
 vtkPlot* vtkChartXY::GetPlot(vtkIdType index)
 {
-  if (static_cast<vtkIdType>(this->ChartPrivate->plots.size()) > index)
-    {
-    return this->ChartPrivate->plots[index];
-    }
-  else
-    {
-    return NULL;
-    }
+  return (static_cast<vtkIdType>(this->ChartPrivate->plots.size()) > index) ?
+    this->ChartPrivate->plots[index] : NULL;
 }
 
 //-----------------------------------------------------------------------------
@@ -1171,13 +1165,13 @@ vtkChartLegend* vtkChartXY::GetLegend()
 //-----------------------------------------------------------------------------
 void vtkChartXY::SetTooltip(vtkTooltipItem *tooltip)
 {
-  if(tooltip == this->Tooltip)
+  if (tooltip == this->Tooltip)
     {
     // nothing to change
     return;
     }
 
-  if(this->Tooltip)
+  if (this->Tooltip)
     {
     // remove current tooltip from scene
     this->RemoveItem(this->Tooltip);
@@ -1185,7 +1179,7 @@ void vtkChartXY::SetTooltip(vtkTooltipItem *tooltip)
 
   this->Tooltip = tooltip;
 
-  if(this->Tooltip)
+  if (this->Tooltip)
     {
     // add new tooltip to scene
     this->AddItem(this->Tooltip);
@@ -1207,14 +1201,7 @@ vtkIdType vtkChartXY::GetNumberOfPlots()
 //-----------------------------------------------------------------------------
 vtkAxis* vtkChartXY::GetAxis(int axisIndex)
 {
-  if (axisIndex < 4)
-    {
-    return this->ChartPrivate->axes[axisIndex];
-    }
-  else
-    {
-    return NULL;
-    }
+  return (axisIndex < 4) ? this->ChartPrivate->axes[axisIndex] : NULL;
 }
 
 //-----------------------------------------------------------------------------
@@ -1222,7 +1209,6 @@ vtkIdType vtkChartXY::GetNumberOfAxes()
 {
   return 4;
 }
-
 
 //-----------------------------------------------------------------------------
 void vtkChartXY::RecalculateBounds()
@@ -1262,17 +1248,10 @@ bool vtkChartXY::Hit(const vtkContextMouseEvent &mouse)
     return false;
     }
   vtkVector2i pos(mouse.GetScreenPos());
-  if (pos[0] > this->Point1[0] &&
+  return (pos[0] > this->Point1[0] &&
       pos[0] < this->Point2[0] &&
       pos[1] > this->Point1[1] &&
-      pos[1] < this->Point2[1])
-    {
-    return true;
-    }
-  else
-    {
-    return false;
-    }
+      pos[1] < this->Point2[1]);
 }
 
 //-----------------------------------------------------------------------------
