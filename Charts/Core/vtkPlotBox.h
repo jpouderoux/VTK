@@ -13,11 +13,18 @@
 
 =========================================================================*/
 
-// .NAME vtkPlotBox - Class for drawing an XY line plot given two columns from
+// .NAME vtkPlotBox - Class for drawing a box plot given one column of
 // a vtkTable.
 //
 // .SECTION Description
+// The selected column of the table must contains the quartiles and the 
+// extremum values in the 5 first lines (the order does not matter).
 //
+// .SECTION See also
+// vtlPlotPoints vtkComputeQuartiles
+//
+// .SECTION Thanks
+// This class was written by Kitware SAS and supported by EDF - www.edf.fr
 
 #ifndef __vtkPlotBox_h
 #define __vtkPlotBox_h
@@ -62,12 +69,9 @@ public:
   virtual void GetUnscaledInputBounds(double bounds[4]);
 
   // Description:
-  // Set the width of the box.
-  vtkSetMacro(BoxWidth, float);
-
-  // Description:
-  // Get the width of the box.
+  // Get/Set the width of the box. Default is 0.2
   vtkGetMacro(BoxWidth, float);
+  vtkSetMacro(BoxWidth, float);
   
 //BTX
 protected:
@@ -80,7 +84,6 @@ protected:
 private:
   vtkPlotBox(const vtkPlotBox &); // Not implemented.
   void operator=(const vtkPlotBox &); // Not implemented.
-
 //ETX
 };
 

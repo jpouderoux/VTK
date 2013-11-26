@@ -32,6 +32,7 @@ vtkStandardNewMacro(vtkPlotBox);
 vtkPlotBox::vtkPlotBox()
 {
   this->MarkerStyle = vtkPlotPoints::NONE;
+  this->Position = 0;
   this->BoxWidth = 0.2;
   this->TooltipDefaultLabelFormat = "%l: %y";
 }
@@ -44,7 +45,7 @@ vtkPlotBox::~vtkPlotBox()
 //-----------------------------------------------------------------------------
 void vtkPlotBox::Update()
 {  
-  vtkPlotPoints::Update();
+  this->Superclass::Update();
 
   // Compute the x-position of the plot by fetching the plot index in the 
   // parent's visible children.
@@ -86,7 +87,6 @@ bool vtkPlotBox::Paint(vtkContext2D *painter)
     return false;
     }
 
-  //painter->ApplyPen(this->Pen);
   this->Brush->SetColor(this->Pen->GetColor());
   vtkNew<vtkPen> blackPen;
   blackPen->SetWidth(this->Pen->GetWidth());
@@ -101,12 +101,11 @@ bool vtkPlotBox::Paint(vtkContext2D *painter)
   double xneg = x - 0.5 * this->BoxWidth;
   double hBoxW = this->BoxWidth * 0.25;
 
+  // Fetch the quartiles and median
   double q[5];
   for (int j = 0; j < 5; j++)
     {
-    double x[3];
-    this->Points->GetPoint(j, x);
-    q[j] = x[1];
+    q[j] = this->Points->GetPoint(j)[1];
     }
   std::sort(q, q+5);
 
@@ -117,15 +116,13 @@ bool vtkPlotBox::Paint(vtkContext2D *painter)
   // extremum values of the quartiles
   painter->DrawLine(x, q[0], x, q[1]);
   painter->DrawLine(x - hBoxW, q[0], x + hBoxW, q[0]);
-
   painter->DrawLine(x, q[3], x, q[4]);  
   painter->DrawLine(x - hBoxW, q[4], x + hBoxW, q[4]);
 
   // Draw the median
   vtkNew<vtkPen> whitePen;
   unsigned char brushColor[4];
-  this->Brush->GetColor(brushColor);
-  
+  this->Brush->GetColor(brushColor);  
   // Use a gray pen if the brush is black so the median is always visible
   if (brushColor[0] == 0 && brushColor[1] == 0 && brushColor[2] == 0)
     {
@@ -149,8 +146,8 @@ bool vtkPlotBox::PaintLegend(vtkContext2D *painter, const vtkRectf& rect, int)
   painter->ApplyPen(blackPen.GetPointer());
   painter->ApplyBrush(this->Brush);
   painter->DrawRect(rect[0], rect[1], rect[2], rect[3]);
-  this->Superclass::PaintLegend(painter, rect, 0);
-  return true;
+  
+  return this->Superclass::PaintLegend(painter, rect, 0);
 }
 
 //-----------------------------------------------------------------------------

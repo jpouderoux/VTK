@@ -1,9 +1,8 @@
 #include "vtkComputeQuartiles.h"
-#include "vtkStatisticsAlgorithm.h"
 #include "vtkDoubleArray.h"
-#include "vtkIntArray.h"
 #include "vtkMultiBlockDataSet.h"
 #include "vtkNew.h"
+#include "vtkStatisticsAlgorithm.h"
 #include "vtkTable.h"
 
 //----------------------------------------------------------------------------
@@ -15,7 +14,7 @@ int TestComputeQuartiles(int , char * [])
   vtkNew<vtkDoubleArray> arrSecondVariable;
   arrSecondVariable->SetName("French");
     
-  // Create a table with two columns in it...
+  // Create a two columns table
   vtkNew<vtkTable> table;
   table->AddColumn(arrFirstVariable.GetPointer());
   table->AddColumn(arrSecondVariable.GetPointer());
@@ -47,20 +46,42 @@ int TestComputeQuartiles(int , char * [])
     table->SetValue(i, 1, FrenchValue[i]);
     }
 
-  // Run Compute Quantiles
-  
+  // Run Compute Quantiles  
   vtkNew<vtkComputeQuartiles> quartiles;
 
   // First verify that absence of input does not cause trouble
   cout << "## Verifying that absence of input does not cause trouble... ";
   quartiles->Update();
-  cout << "done.\n";
+  cout << "Done.\n";
 
+  // Now set the real input table
   quartiles->SetInputData(vtkStatisticsAlgorithm::INPUT_DATA, table.GetPointer());
   quartiles->Update();
 
-  vtkTable* quartileTables = quartiles->GetOutput();
-  quartileTables->Dump();
+  vtkTable *outTable = quartiles->GetOutput();
+  outTable->Dump();
 
-  return EXIT_SUCCESS;
+  const double MathQuartiles[] = 
+    {
+    4, 13.5, 15, 16, 20
+    };
+  const double FrenchQuartiles[] = 
+    {
+    2, 9, 14, 14, 20
+    };
+
+  bool ret = EXIT_SUCCESS;
+
+  for (int i = 0; i < 5; i++)
+    {
+    if (outTable->GetValue(i, 0).ToFloat() != MathQuartiles[i] ||
+      outTable->GetValue(i, 1).ToFloat() != FrenchQuartiles[i])
+      {
+      ret = EXIT_FAILURE;
+      }
+    }
+
+  cout << ((ret == EXIT_SUCCESS) ? "Success." : "Failure.") << endl;
+
+  return ret;
 }

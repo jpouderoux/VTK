@@ -18,23 +18,16 @@
 #include "vtkCompositeDataIterator.h"
 #include "vtkCompositeDataSet.h"
 #include "vtkDataSet.h"
-#include "vtkOrderStatistics.h"
 #include "vtkDoubleArray.h"
 #include "vtkGraph.h"
-#include "vtkIdTypeArray.h"
 #include "vtkInformation.h"
 #include "vtkInformationVector.h"
-#include "vtkIntArray.h"
-#include "vtkIOStream.h"
-#include "vtkMath.h"
 #include "vtkMultiBlockDataSet.h"
 #include "vtkNew.h"
 #include "vtkObjectFactory.h"
-#include "vtkOnePieceExtentTranslator.h"
+#include "vtkOrderStatistics.h"
 #include "vtkPointData.h"
-#include "vtkSmartPointer.h"
 #include "vtkStreamingDemandDrivenPipeline.h"
-#include "vtkStringArray.h"
 #include "vtkTable.h"
 
 #include <sstream>
@@ -133,26 +126,10 @@ int vtkComputeQuartiles::RequestData(vtkInformation* /*request*/,
   vtkInformation* inInfo = inputVector[0]->GetInformationObject(0);
   vtkDataObject *input = inInfo->Get(vtkDataObject::DATA_OBJECT());  
   vtkTable* outputTable = vtkTable::GetData(outputVector, 0);
-  
-  //// Initialize output table
-  //vtkNew<vtkStringArray> attributeName;
-  //attributeName->SetName("Attribute Name");
-  //outputTable->AddColumn(attributeName.GetPointer());
-  //vtkNew<vtkDoubleArray> q[5];
-  //for (int i = 0; i < 5; i++)
-  //  {
-  //  std::stringstream ss;
-  //  ss << "q" << i;
-  //  q[i]->SetName(ss.str().c_str());
-  //  outputTable->AddColumn(q[i].GetPointer());
-  //  }
-  
+    
   vtkCompositeDataSet *cdin = vtkCompositeDataSet::SafeDownCast(input);
   if (cdin)
     {
-    /*vtkNew<vtkIdTypeArray> blockId;
-    blockId->SetName("Block");
-    outputTable->AddColumn(blockId.GetPointer());*/
     vtkCompositeDataIterator* iter = cdin->NewIterator();
     for (iter->InitTraversal(); !iter->IsDoneWithTraversal(); iter->GoToNextItem())
       {
@@ -219,13 +196,14 @@ void vtkComputeQuartiles::ComputeTable(vtkDataObject* input,
   os->SetAssessOption(false);
   os->Update();
 
-
   // Get the ouput table of the descriptive statistics that contains quantiles 
   // of the input data series.
   vtkMultiBlockDataSet *outputModelDS =
-    vtkMultiBlockDataSet::SafeDownCast(os->GetOutputDataObject(vtkStatisticsAlgorithm::OUTPUT_MODEL));
+    vtkMultiBlockDataSet::SafeDownCast(
+    os->GetOutputDataObject(vtkStatisticsAlgorithm::OUTPUT_MODEL));
   unsigned nbq = outputModelDS->GetNumberOfBlocks() - 1;
-  vtkTable* outputQuartiles = vtkTable::SafeDownCast(outputModelDS->GetBlock(nbq));
+  vtkTable* outputQuartiles = 
+    vtkTable::SafeDownCast(outputModelDS->GetBlock(nbq));
   if (!outputQuartiles || outputQuartiles->GetNumberOfColumns() < 2)
     {
     return;
@@ -234,31 +212,17 @@ void vtkComputeQuartiles::ComputeTable(vtkDataObject* input,
   vtkIdType currLen = outputTable->GetNumberOfColumns();
   vtkIdType outLen = outputQuartiles->GetNumberOfColumns() - 1;
 
-  //// Resize the output len with the new row
-  //for (int i = 0; i < outputTable->GetNumberOfColumns(); i++)
-  //  {
-  //  vtkAbstractArray* da = outputTable->GetColumn(i);
-  //  da->Resize(currLen + outLen);
-  //  da->SetNumberOfTuples(currLen + outLen);
-  //  }
-
   // Fill the table
   for (int j = 0; j < outLen; j++)
-    {
-    inDescStats->GetColumnName(j);
-
-    //outputTable->SetValue(0, currLen + j, 0, inDescStats->GetColumnName(j));
-    vtkAbstractArray *col = outputQuartiles->GetColumnByName(inDescStats->GetColumnName(j));
+    {        
     vtkNew<vtkDoubleArray> ncol;
-    ncol->SetName(inDescStats->GetColumnName(j));
     ncol->SetNumberOfComponents(1);
     ncol->SetNumberOfValues(5);
     outputTable->AddColumn(ncol.GetPointer());
     if (blockId >= 0)
       {
       std::stringstream ss;
-      ss << inDescStats->GetColumnName(j) << "_block_" << blockId;
-      outputTable->SetValue(currLen + j, 6, blockId);
+      ss << inDescStats->GetColumnName(j) << "_Block_" << blockId;      
       ncol->SetName(ss.str().c_str());
       }
     else
@@ -266,14 +230,10 @@ void vtkComputeQuartiles::ComputeTable(vtkDataObject* input,
       ncol->SetName(inDescStats->GetColumnName(j));
       }
 
+    vtkAbstractArray *col = outputQuartiles->GetColumnByName(inDescStats->GetColumnName(j));
     for (int k = 0; k < 5; k++)
       {
       outputTable->SetValue(k, currLen + j, col ? col->GetVariantValue(k).ToDouble() : 0.0);
-      }
-
-    if (blockId >= 0)
-      {
-      outputTable->SetValue(currLen + j, 6, blockId);
-      }
+      }    
     }
 }

@@ -36,6 +36,8 @@ int TestBoxPlot(int , char * [])
   // Set up a 2D scene, add an XY chart to it
   vtkNew<vtkContextView> view;
   view->GetRenderWindow()->SetSize(400, 400);
+  view->GetRenderWindow()->SetMultiSamples(0);
+
   vtkNew<vtkChartXY> chart;
   view->GetScene()->AddItem(chart.GetPointer());
   chart->GetAxis(vtkAxis::BOTTOM)->SetLabelsVisible(false);
@@ -67,11 +69,11 @@ int TestBoxPlot(int , char * [])
     
   for (int i = 0; i < numParam; i++)
     {    
-    inputBoxPlotTable->SetValue(0, i, i);     //Q0
-    inputBoxPlotTable->SetValue(1, i, i + 2); //Q1
-    inputBoxPlotTable->SetValue(2, i, i + 4); //Q2
-    inputBoxPlotTable->SetValue(3, i, i + 7); //Q3
-    inputBoxPlotTable->SetValue(4, i, i + 8); //Q4
+    inputBoxPlotTable->SetValue(0, i, i/2);     //Q0
+    inputBoxPlotTable->SetValue(1, i, 2*i + 2 - i); //Q1
+    inputBoxPlotTable->SetValue(2, i, 2*i + 4); //Q2
+    inputBoxPlotTable->SetValue(3, i, 2*i + 7); //Q3
+    inputBoxPlotTable->SetValue(4, i, 2*i + 8); //Q4
     }
 
   vtkNew<vtkLookupTable> lookup;

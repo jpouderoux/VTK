@@ -24,10 +24,21 @@ class vtkDoubleArray;
 class vtkFieldData;
 class vtkTable;
 
-// .NAME vtkComputeQuartiles - Extract quartiles from any dataset
+// .NAME vtkComputeQuartiles - Extract quartiles and extremum values
+// of all columns of a table or all fields of a dataset.
+//
 // .SECTION Description
-// vtkComputeQuartiles accepts any vtkDataSet as input and produces a
+// vtkComputeQuartiles accepts any vtkDataObject as input and produces a
 // vtkTable data as output.
+// This filter can be used to generate a table to create box plots 
+// using vtkPlotBox instances.
+// The filter internally uses vtkOrderStatistics to compute quartiles.
+//
+// .SECTION See also
+// vtkTableAlgorithm vtkOrderStatistics vtkPlotBox
+//
+// .SECTION Thanks
+// This class was written by Kitware SAS and supported by EDF - www.edf.fr
 
 class VTKFILTERSSTATISTICS_EXPORT vtkComputeQuartiles : public vtkTableAlgorithm
 {
