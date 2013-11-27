@@ -13,28 +13,24 @@
 
 =========================================================================*/
 
-#include "vtkAxis.h"
 #include "vtkChartXY.h"
 #include "vtkContextScene.h"
 #include "vtkContextView.h"
 #include "vtkDoubleArray.h"
 #include "vtkIntArray.h"
-#include "vtkMultiBlockDataSet.h"
 #include "vtkNew.h"
-#include "vtkOrderStatistics.h"
 #include "vtkPlotBag.h"
-#include "vtkRenderer.h"
 #include "vtkRenderWindow.h"
 #include "vtkRenderWindowInteractor.h"
 #include "vtkTable.h"
-#include "vtkTimerLog.h"
 
 //----------------------------------------------------------------------------
-int TestBagPlot(int , char * [])
+int TestBagPlot(int, char * [])
 {
   // Set up a 2D scene, add an XY chart to it
   vtkNew<vtkContextView> view;
-  view->GetRenderWindow()->SetSize(800, 600);
+  view->GetRenderWindow()->SetSize(400, 400);
+  view->GetRenderWindow()->SetMultiSamples(0);
   vtkNew<vtkChartXY> chart;
   view->GetScene()->AddItem(chart.GetPointer());
 
@@ -43,7 +39,6 @@ int TestBagPlot(int , char * [])
   // the bag will represent a square inside of side 5
   int numDataI = 20;
   int numDataJ = 20;
-  int sideBag = 5;
 
   vtkNew<vtkTable> inputBagPlotTable;
 
@@ -55,9 +50,9 @@ int TestBagPlot(int , char * [])
   arrY->SetName("Y");
   inputBagPlotTable->AddColumn(arrY.GetPointer());
 
-  vtkNew<vtkDoubleArray> arrBag;
-  arrBag->SetName("Bag");
-  inputBagPlotTable->AddColumn(arrBag.GetPointer());
+  vtkNew<vtkDoubleArray> arrDensity;
+  arrDensity->SetName("Density");
+  inputBagPlotTable->AddColumn(arrDensity.GetPointer());
 
   // Test charting with numData Bag plot.
   inputBagPlotTable->SetNumberOfRows(numDataI * numDataJ);
@@ -73,48 +68,19 @@ int TestBagPlot(int , char * [])
       {
       inputBagPlotTable->SetValue(j * numDataI + i, 0, i); //X
       inputBagPlotTable->SetValue(j * numDataI + i, 1, j); //Y
-      inputBagPlotTable->SetValue(j * numDataI + i, 2, -1); // Bag init
+      inputBagPlotTable->SetValue(j * numDataI + i, 2, rand()/(double)RAND_MAX); // Density
       }
     }
-
-  // let's create the four side of the square
-  // Bottom
-  int indexInOrder = 0;
-  for (int i = 0; i < sideBag; ++i)
-    {
-    inputBagPlotTable->SetValue(4 * numDataI + 4 + i, 2, i); // Bag
-    }
-  indexInOrder = sideBag;
-  // Right
-  for (int i = 0; i < sideBag - 1; ++i)
-    {
-    inputBagPlotTable->SetValue((sideBag + i) * numDataI + 4 + sideBag - 1, 2, indexInOrder + i); // Bag
-    }
-  indexInOrder += sideBag - 1;
-  // Top
-  for (int i = 0; i < sideBag - 1; ++i)
-    {
-    inputBagPlotTable->SetValue((4 + sideBag - 1) * numDataI + 4 + (sideBag - i) - 2, 2, indexInOrder + i); // Bag
-    }
-  indexInOrder += sideBag - 1;
-  // Left
-  for (int i = 0; i < sideBag - 2; ++i)
-    {
-    inputBagPlotTable->SetValue((4 +sideBag - 2 - i) * numDataI + 4, 2, indexInOrder + i); // Bag
-    }
-
-
+  
   chart->SetShowLegend(true);
 
-  // Set the vtkPlotBag (here 4 bags have to been displayed)
   vtkNew<vtkPlotBag> bagPlot;
   chart->AddPlot(bagPlot.GetPointer());
   bagPlot->SetInputData(inputBagPlotTable.GetPointer(), arrX->GetName(),
-    arrY->GetName(), arrBag->GetName());
+    arrY->GetName(), arrDensity->GetName());
   bagPlot->SetColor(255, 0, 0, 255);
 
-  // Render the scene
-  view->GetRenderWindow()->SetMultiSamples(0);
+  // Render the scene  
   view->GetInteractor()->Initialize();
   view->GetInteractor()->Start();
 

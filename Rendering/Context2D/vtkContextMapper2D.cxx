@@ -26,7 +26,7 @@ vtkStandardNewMacro(vtkContextMapper2D);
 vtkContextMapper2D::vtkContextMapper2D()
 {
   // We take 1 input and no outputs
-  this->SetNumberOfInputPorts(1);
+  this->SetNumberOfInputPorts(2);
   this->SetNumberOfOutputPorts(0);
 }
 
@@ -48,12 +48,15 @@ vtkTable * vtkContextMapper2D::GetInput()
 }
 
 //-----------------------------------------------------------------------------
-int vtkContextMapper2D::FillInputPortInformation(int, vtkInformation *info)
+int vtkContextMapper2D::FillInputPortInformation(int port, vtkInformation *info)
 {
   info->Set(vtkAlgorithm::INPUT_REQUIRED_DATA_TYPE(), "vtkTable");
+  if (port == 1)
+    {
+    info->Set(vtkAlgorithm::INPUT_IS_OPTIONAL(), 1);
+    }
   return 1;
 }
-
 
 //-----------------------------------------------------------------------------
 void vtkContextMapper2D::PrintSelf(ostream &os, vtkIndent indent)

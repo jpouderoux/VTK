@@ -24,7 +24,7 @@ vtkStandardNewMacro(vtkHighestDensityRegionsStatistics);
 
 // ----------------------------------------------------------------------
 vtkHighestDensityRegionsStatistics::vtkHighestDensityRegionsStatistics()
-{
+  {
   // Initialize H smooth matrix to Identity.
   this->SmoothHC1[0] = 1.0;
   this->SmoothHC1[1] = 0.0;
@@ -33,30 +33,30 @@ vtkHighestDensityRegionsStatistics::vtkHighestDensityRegionsStatistics()
 
   //  At the construction, no columns pair are requested yet
   this->NumberOfRequestedColumnsPair = 0;
-}
+  }
 
 // ----------------------------------------------------------------------
 vtkHighestDensityRegionsStatistics::~vtkHighestDensityRegionsStatistics()
-{
-}
+  {
+  }
 
 // ----------------------------------------------------------------------
 void vtkHighestDensityRegionsStatistics::PrintSelf(ostream& os,
                                                    vtkIndent indent)
-{
+  {
   this->Superclass::PrintSelf(os, indent);
 
-  os << indent << "Smooth matrix: " << 
+  os << indent << "Smooth matrix: " <<
     this->SmoothHC1[0] << ", " <<
     this->SmoothHC1[1] << ", " <<
     this->SmoothHC2[0] << ", " <<
     this->SmoothHC2[1] << "\n";
-}
+  }
 
 // ----------------------------------------------------------------------
 void vtkHighestDensityRegionsStatistics::SetSigma(double sigma)
-{  
-  if (this->SmoothHC1[0] == sigma && 
+  {
+  if (this->SmoothHC1[0] == sigma &&
     this->SmoothHC1[1] == 0.0 &&
     this->SmoothHC2[0] == 0.0 &&
     this->SmoothHC2[1] == sigma)
@@ -69,13 +69,13 @@ void vtkHighestDensityRegionsStatistics::SetSigma(double sigma)
   this->SmoothHC2[0] = 0.0;
   this->SmoothHC2[1] = sigma;
   this->Modified();
-}
+  }
 
 // ----------------------------------------------------------------------
 void vtkHighestDensityRegionsStatistics::Learn(vtkTable* inData,
                                                vtkTable* vtkNotUsed(inParameters),
                                                vtkMultiBlockDataSet* outMeta)
-{
+  {
   if (!inData || !outMeta)
     {
     return;
@@ -92,7 +92,7 @@ void vtkHighestDensityRegionsStatistics::Learn(vtkTable* inData,
   // Populate outputColumns with columns that are requested from
   // the input dataset
   for (reqIt = this->Internals->Requests.begin();
-       reqIt != this->Internals->Requests.end(); ++ reqIt)
+    reqIt != this->Internals->Requests.end(); ++ reqIt)
     {
     // Each request contains only one pair of columns of interest
     // (if there are others, they are ignored).
@@ -101,8 +101,8 @@ void vtkHighestDensityRegionsStatistics::Learn(vtkTable* inData,
     if (!inData->GetColumnByName(colX.c_str()))
       {
       vtkWarningMacro("InData table does not have a column "
-                       << colX.c_str()
-                       << ". Ignoring this pair.");
+        << colX.c_str()
+        << ". Ignoring this pair.");
       continue;
       }
 
@@ -111,8 +111,8 @@ void vtkHighestDensityRegionsStatistics::Learn(vtkTable* inData,
     if (!inData->GetColumnByName(colY.c_str()))
       {
       vtkWarningMacro("InData table does not have a column "
-                       << colY.c_str()
-                       << ". Ignoring this pair.");
+        << colY.c_str()
+        << ". Ignoring this pair.");
       continue;
       }
 
@@ -124,7 +124,7 @@ void vtkHighestDensityRegionsStatistics::Learn(vtkTable* inData,
     if (!inputColX || !inputColY)
       {
       vtkErrorMacro(
-            << "HDR cannot work with columns that are not of vtkDataArray type");
+        << "HDR cannot work with columns that are not of vtkDataArray type");
       return;
       }
 
@@ -172,29 +172,29 @@ void vtkHighestDensityRegionsStatistics::Learn(vtkTable* inData,
   outMeta->SetBlock(0, outputColumns.GetPointer());
   outMeta->GetMetaData(static_cast<unsigned int>(0))->
     Set(vtkCompositeDataSet::NAME(), "Estimator of density Data");
-}
+  }
 
 // ----------------------------------------------------------------------
 void vtkHighestDensityRegionsStatistics::Derive(vtkMultiBlockDataSet* outMeta)
-{
+  {
   vtkTable *hdrTab;
 
   if (!outMeta ||
-      !(hdrTab = vtkTable::SafeDownCast(outMeta->GetBlock(0)))
-     )
+    !(hdrTab = vtkTable::SafeDownCast(outMeta->GetBlock(0)))
+    )
     {
     vtkErrorMacro(<< "Cannot derive: learn method never called");
     return;
     }
-    
+
   // Compute sorted HDR for the last NumberOfRequestedColumnsPair
   // columns computed by Learn method. Sorted HDR is of same type as HDR
   for (vtkIdType i = 0; i < this->NumberOfRequestedColumnsPair; ++i)
     {
     vtkDataArray *hdr;
     if (!(hdr = vtkDataArray::SafeDownCast(
-            hdrTab->GetColumn(hdrTab->GetNumberOfColumns()
-                              - this->NumberOfRequestedColumnsPair + i))))
+      hdrTab->GetColumn(hdrTab->GetNumberOfColumns()
+      - this->NumberOfRequestedColumnsPair + i))))
       {
       vtkErrorMacro(<< "HDR column must be of vtkDataArray type");
       return;
@@ -207,7 +207,7 @@ void vtkHighestDensityRegionsStatistics::Derive(vtkMultiBlockDataSet* outMeta)
       }
 
     normFactor = 1.0 / normFactor;
-    
+
     // Creation of the hdr array.
     vtkSmartPointer<vtkDataArray> normalizedHDR =
       vtkDataArray::CreateDataArray(hdr->GetDataType());
@@ -222,19 +222,19 @@ void vtkHighestDensityRegionsStatistics::Derive(vtkMultiBlockDataSet* outMeta)
 
     hdrTab->AddColumn(normalizedHDR);
     }
-}
+  }
 
 // ----------------------------------------------------------------------
 double vtkHighestDensityRegionsStatistics::ComputeHDR(vtkDataArray *inObservations,
-                                                    vtkDataArray *outDensity)
-{
+                                                      vtkDataArray *outDensity)
+  {
   vtkIdType nbObservations = inObservations->GetNumberOfTuples();
 
   if (nbObservations == 0)
     {
     vtkErrorMacro(<< "Empty observation array");
     return 0.0;
-    } 
+    }
   double sum  = 0.0;
 
   double denom = 1.0 / static_cast<double>(nbObservations);
@@ -259,22 +259,22 @@ double vtkHighestDensityRegionsStatistics::ComputeHDR(vtkDataArray *inObservatio
       inObservations->GetTuple(j, currentXj);
 
       hdr += this->ComputeSmoothGaussianKernel(
-             inObservations->GetNumberOfComponents(),
-             currentXi[0] - currentXj[0],
-             currentXi[1] - currentXj[1]);
+        inObservations->GetNumberOfComponents(),
+        currentXi[0] - currentXj[0],
+        currentXi[1] - currentXj[1]);
       }
     double d = denom * hdr;
     outDensity->SetTuple1(i, d);
     sum += d;
     }
-  
+
   return sum;
-}
+  }
 
 // ----------------------------------------------------------------------
 double vtkHighestDensityRegionsStatistics::ComputeSmoothGaussianKernel(
-    int dimension, double khx, double khy)
-{
+  int dimension, double khx, double khy)
+  {
   double HDeterminant =
     vtkMath::Determinant2x2(this->SmoothHC1, this->SmoothHC2);
   // TODO: Check if HDeterminant is negative ! and what to do...
@@ -314,13 +314,13 @@ double vtkHighestDensityRegionsStatistics::ComputeSmoothGaussianKernel(
   // Call the standard gaussian kernel with the new random vector.
   return HDeterminant *
     this->ComputeStandardGaussianKernel(dimension,
-                                        SHC10 * khx + SHC11 * khy,
-                                        SHC20 * khx + SHC21 * khy);
-}
+    SHC10 * khx + SHC11 * khy,
+    SHC20 * khx + SHC21 * khy);
+  }
 
 // ----------------------------------------------------------------------
 double vtkHighestDensityRegionsStatistics::ComputeStandardGaussianKernel(
-    int vtkNotUsed(dimension), double kx, double ky)
-{
+  int vtkNotUsed(dimension), double kx, double ky)
+  {
   return exp(-(kx * kx + ky * ky) / 2.0) / (2.0 * vtkMath::Pi());
-}
+  }
