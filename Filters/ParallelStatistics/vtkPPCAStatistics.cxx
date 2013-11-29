@@ -21,12 +21,15 @@
 
 #include "vtkPPCAStatistics.h"
 
+#include "vtkAbstractArray.h"
 #include "vtkCommunicator.h"
 #include "vtkInformation.h"
 #include "vtkInformationVector.h"
 #include "vtkMultiBlockDataSet.h"
-#include "vtkObjectFactory.h"
 #include "vtkMultiProcessController.h"
+#include "vtkNew.h"
+#include "vtkObjectFactory.h"
+#include "vtkPOrderStatistics.h"
 #include "vtkTable.h"
 #include "vtkPMultiCorrelativeStatistics.h"
 #include "vtkVariant.h"
@@ -64,7 +67,7 @@ void vtkPPCAStatistics::Learn( vtkTable* inData,
     {
     return;
     }
-
+    
   // First calculate correlative statistics on local data set
   this->Superclass::Learn( inData, inParameters, outMeta );
 
@@ -75,7 +78,10 @@ void vtkPPCAStatistics::Learn( vtkTable* inData,
     return;
     }
 
-  vtkPMultiCorrelativeStatistics::GatherStatistics( this->Controller, sparseCov );
+  if ( !this->MedianAbosluteVariance )
+    {
+    vtkPMultiCorrelativeStatistics::GatherStatistics( this->Controller, sparseCov );
+    }
 }
 
 // ----------------------------------------------------------------------
@@ -90,4 +96,30 @@ void vtkPPCAStatistics::Test( vtkTable* inData,
     }
 
   this->Superclass::Test( inData, inMeta, outMeta );
+}
+
+void vtkPPCAStatistics::ComputeMedian(vtkTable* inData, vtkTable* outData)
+{
+  vtkNew<vtkPOrderStatistics> orderStats;
+  vtkNew<vtkTable> inOrderStats;
+  orderStats->SetInputData(vtkStatisticsAlgorithm::INPUT_DATA, inOrderStats.GetPointer());
+  for (vtkIdType i = 0; i < inData->GetNumberOfColumns(); ++ i )
+    {
+    inOrderStats->AddColumn(inData->GetColumn(i));
+    orderStats->AddColumn(inData->GetColumn(i)->GetName());
+    }
+  orderStats->SetNumberOfIntervals(2);
+  orderStats->SetLearnOption(true);
+  orderStats->SetDeriveOption(true);
+  orderStats->SetTestOption(false);
+  orderStats->SetAssessOption(false);
+  orderStats->Update();
+  // Gets the Median
+  vtkMultiBlockDataSet *outputOrderStats =
+    vtkMultiBlockDataSet::SafeDownCast(
+    orderStats->GetOutputDataObject(vtkStatisticsAlgorithm::OUTPUT_MODEL));
+  outData->DeepCopy(vtkTable::SafeDownCast(
+    outputOrderStats->GetBlock(outputOrderStats->GetNumberOfBlocks() - 1)));
+
+   return ;
 }

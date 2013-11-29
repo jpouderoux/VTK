@@ -21,12 +21,15 @@
 
 #include "vtkPMultiCorrelativeStatistics.h"
 
+#include "vtkAbstractArray.h"
 #include "vtkCommunicator.h"
 #include "vtkInformation.h"
 #include "vtkInformationVector.h"
 #include "vtkMultiBlockDataSet.h"
-#include "vtkObjectFactory.h"
 #include "vtkMultiProcessController.h"
+#include "vtkNew.h"
+#include "vtkObjectFactory.h"
+#include "vtkPOrderStatistics.h"
 #include "vtkTable.h"
 #include "vtkVariant.h"
 
@@ -74,7 +77,10 @@ void vtkPMultiCorrelativeStatistics::Learn( vtkTable* inData,
     return;
     }
 
-  vtkPMultiCorrelativeStatistics::GatherStatistics( this->Controller, sparseCov );
+  if ( !this->MedianAbosluteVariance )
+    {
+    vtkPMultiCorrelativeStatistics::GatherStatistics( this->Controller, sparseCov );
+    }
 }
 
 // ----------------------------------------------------------------------
@@ -211,4 +217,30 @@ void vtkPMultiCorrelativeStatistics::GatherStatistics( vtkMultiProcessController
   delete [] M_l;
   delete [] M_g;
   delete [] n_g;
+}
+
+void vtkPMultiCorrelativeStatistics::ComputeMedian(vtkTable* inData, vtkTable* outData)
+{
+    vtkNew<vtkPOrderStatistics> orderStats;
+    vtkNew<vtkTable> inOrderStats;
+    orderStats->SetInputData(vtkStatisticsAlgorithm::INPUT_DATA, inOrderStats.GetPointer());
+    for (vtkIdType i = 0; i < inData->GetNumberOfColumns(); ++ i )
+      {
+      inOrderStats->AddColumn(inData->GetColumn(i));
+      orderStats->AddColumn(inData->GetColumn(i)->GetName());
+      }
+    orderStats->SetNumberOfIntervals(2);
+    orderStats->SetLearnOption(true);
+    orderStats->SetDeriveOption(true);
+    orderStats->SetTestOption(false);
+    orderStats->SetAssessOption(false);
+    orderStats->Update();
+    // Gets the Median
+    vtkMultiBlockDataSet *outputOrderStats =
+      vtkMultiBlockDataSet::SafeDownCast(
+      orderStats->GetOutputDataObject(vtkStatisticsAlgorithm::OUTPUT_MODEL));
+    outData = vtkTable::SafeDownCast(
+      outputOrderStats->GetBlock(outputOrderStats->GetNumberOfBlocks() - 1));
+
+   return ;
 }

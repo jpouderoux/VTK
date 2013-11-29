@@ -47,6 +47,9 @@ PURPOSE.  See the above copyright notice for more information.
 //      ColC    |avg(C)   |chol(2,1)|chol(2,2)|cov(C,C)
 //      Cholesky|length(A)|chol(3,1)|chol(3,2)|chol(3,3)
 //   </pre>
+//   The mean point and the covariance matrix can be replaced by the median point and the
+//   MAD matrix (Median Absolute Variance) thanks to the MedianAbosluteVariance boolean.
+//   These changes are used for the robust PCA for instance.
 // * Assess: given a set of results matrices as specified above in input port INPUT_MODEL and
 //   tabular data on input port INPUT_DATA that contains column names matching those
 //   of the tables on input port INPUT_MODEL, the assess mode computes the relative
@@ -64,6 +67,7 @@ PURPOSE.  See the above copyright notice for more information.
 #include "vtkFiltersStatisticsModule.h" // For export macro
 #include "vtkStatisticsAlgorithm.h"
 
+class vtkDoubleArray;
 class vtkMultiBlockDataSet;
 class vtkVariant;
 
@@ -78,6 +82,12 @@ public:
   // Given a collection of models, calculate aggregate model
   virtual void Aggregate( vtkDataObjectCollection*,
                           vtkMultiBlockDataSet* );
+
+  // Description:
+  // If set to true, the covariance matrix is replaced by
+  // the Median Absolute Variance matrix.
+  vtkSetMacro(MedianAbosluteVariance,bool);
+  vtkGetMacro(MedianAbosluteVariance,bool);
 
 protected:
   vtkMultiCorrelativeStatistics();
@@ -113,6 +123,12 @@ protected:
                                     vtkStringArray* rowNames,
                                     AssessFunctor*& dfunc );
   //ETX
+
+  // Description:
+  // Computes the median of inData with vtkOrderStatistics.
+  virtual void ComputeMedian(vtkTable* inData, vtkTable* outData);
+
+  bool MedianAbosluteVariance;
 
 private:
   vtkMultiCorrelativeStatistics( const vtkMultiCorrelativeStatistics& ); // Not implemented

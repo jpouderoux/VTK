@@ -62,7 +62,10 @@ protected:
   virtual void Learn( vtkTable* inData,
                       vtkTable* inParameters,
                       vtkMultiBlockDataSet* outMeta );
-
+  
+  // Description:
+  // Computes the median of inData with vtkPOrderStatistics.
+  virtual void ComputeMedian(vtkTable* inData, vtkTable* outData);
 
 private:
   vtkPMultiCorrelativeStatistics(const vtkPMultiCorrelativeStatistics&); // Not implemented.

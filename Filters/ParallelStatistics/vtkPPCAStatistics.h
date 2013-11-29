@@ -68,6 +68,10 @@ protected:
                      vtkMultiBlockDataSet*,
                      vtkTable* );
 
+  // Description:
+  // Computes the median of inData with vtkPOrderStatistics.
+  virtual void ComputeMedian(vtkTable* inData, vtkTable* outData);
+
 private:
   vtkPPCAStatistics(const vtkPPCAStatistics&); // Not implemented.
   void operator=(const vtkPPCAStatistics&); // Not implemented.
