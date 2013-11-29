@@ -127,7 +127,7 @@ void vtkHighestDensityRegionsStatistics::Learn(vtkTable* inData,
         << "HDR cannot work with columns that are not of vtkDataArray type");
       return;
       }
-
+    
     vtkSmartPointer<vtkDataArray> arrX =
       vtkDataArray::CreateDataArray(inputColX->GetDataType());
     arrX->DeepCopy(inputColX);
@@ -160,7 +160,7 @@ void vtkHighestDensityRegionsStatistics::Learn(vtkTable* inData,
 
     this->ComputeHDR(inObservations.GetPointer(), outObservations);
     std::stringstream name;
-    name << "f(" << inputColX->GetName() << "," << inputColY->GetName() << ")";
+    name << "HDR"; //f(" << inputColX->GetName() << "," << inputColY->GetName() << ")";
     outObservations->SetName(name.str().c_str());
     outputColumns->AddColumn(outObservations);
 
@@ -206,12 +206,15 @@ void vtkHighestDensityRegionsStatistics::Derive(vtkMultiBlockDataSet* outMeta)
       normFactor += hdr->GetTuple1(j);
       }
 
-    normFactor = 1.0 / normFactor;
+    if (normFactor != 0.0)
+      {
+      normFactor = 1.0 / normFactor;
+      }
 
     // Creation of the hdr array.
     vtkSmartPointer<vtkDataArray> normalizedHDR =
       vtkDataArray::CreateDataArray(hdr->GetDataType());
-    std::string name = std::string(hdr->GetName()) + "N";
+    std::string name = "HDRn";//std::string(hdr->GetName()) + "N";
     normalizedHDR->SetName(name.c_str());
     normalizedHDR->SetNumberOfComponents(1);
     normalizedHDR->SetNumberOfTuples(hdr->GetNumberOfTuples());

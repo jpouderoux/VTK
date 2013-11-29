@@ -37,7 +37,7 @@ vtkStandardNewMacro(vtkPlotBag);
 vtkPlotBag::vtkPlotBag()
 {
   this->MedianPoints = vtkPoints2D::New();
-  this->Q1Points = vtkPoints2D::New();
+  this->Q3Points = vtkPoints2D::New();
 }
 
 //-----------------------------------------------------------------------------
@@ -48,18 +48,16 @@ vtkPlotBag::~vtkPlotBag()
     this->MedianPoints->Delete();
     this->MedianPoints = 0;
     }
-  if (this->Q1Points)
+  if (this->Q3Points)
     {
-    this->Q1Points->Delete();
-    this->Q1Points = 0;
+    this->Q3Points->Delete();
+    this->Q3Points = 0;
     }
 }
 
 //-----------------------------------------------------------------------------
 void vtkPlotBag::Update()
 {
-  this->Superclass::Update();
-
   if (!this->Visible)
     {
     return;
@@ -73,10 +71,14 @@ void vtkPlotBag::Update()
     {
     vtkDebugMacro(<< "Update event called with no input table or bag column set.");
     return;
-    }
-  if (this->Data->GetMTime() > this->BuildTime ||
+    } 
+  bool update = (this->Data->GetMTime() > this->BuildTime ||
     table->GetMTime() > this->BuildTime ||
-    this->MTime > this->BuildTime)
+    this->MTime > this->BuildTime);
+  
+  this->Superclass::Update();
+
+  if (update)
     {
     vtkDebugMacro(<< "Updating cached values.");
     this->UpdateTableCache(bag);
@@ -98,6 +100,10 @@ public:
 //-----------------------------------------------------------------------------
 void vtkPlotBag::UpdateTableCache(vtkDataArray* density)
 {
+  if (!this->Points) 
+    {
+    return;
+    }
   vtkIdType nbPoints = density->GetNumberOfTuples();
 
   // Sort the density array
@@ -129,8 +135,8 @@ void vtkPlotBag::UpdateTableCache(vtkDataArray* density)
   ArraySorter arraySorter(density);
   std::sort(ids.begin(), ids.end(), arraySorter);
   
-  vtkNew<vtkPointsProjectedHull> q1Points;
-  q1Points->Allocate(nbPoints);
+  vtkNew<vtkPointsProjectedHull> q3Points;
+  q3Points->Allocate(nbPoints);
   vtkNew<vtkPointsProjectedHull> medianPoints;
   medianPoints->Allocate(nbPoints);
 
@@ -142,20 +148,17 @@ void vtkPlotBag::UpdateTableCache(vtkDataArray* density)
       {
       break;
       }
-    //vtkErrorMacro( << "sum " << sum << " pt " << ids[i] );
     double x[3];
     this->Points->GetPoint(ids[i], x);
     if (sum <= 0.5)
       {
       medianPoints->InsertNextPoint(x);      
-      //vtkErrorMacro( << "added in median" );
       }
-    q1Points->InsertNextPoint(x);
-    //vtkErrorMacro( << "added in q1" );
+    q3Points->InsertNextPoint(x);
     }
 
   this->MedianPoints->Reset();
-  this->Q1Points->Reset();
+  this->Q3Points->Reset();
 
   // Compute the convex hull for the median points
   if (medianPoints->GetNumberOfPoints() > 0)
@@ -171,16 +174,16 @@ void vtkPlotBag::UpdateTableCache(vtkDataArray* density)
     }
  
   // Compute the convex hull for the first quartile points
-  if (q1Points->GetNumberOfPoints() > 0)
+  if (q3Points->GetNumberOfPoints() > 0)
     {
-    int size = q1Points->GetSizeCCWHullZ();    
-    this->Q1Points->SetDataTypeToFloat();
-    this->Q1Points->SetNumberOfPoints(size+1);
-    q1Points->GetCCWHullZ(
-      (float*)this->Q1Points->GetData()->GetVoidPointer(0), size);
+    int size = q3Points->GetSizeCCWHullZ();    
+    this->Q3Points->SetDataTypeToFloat();
+    this->Q3Points->SetNumberOfPoints(size+1);
+    q3Points->GetCCWHullZ(
+      (float*)this->Q3Points->GetData()->GetVoidPointer(0), size);
     double x[3];
-    this->Q1Points->GetPoint(0, x);
-    this->Q1Points->SetPoint(size, x);
+    this->Q3Points->GetPoint(0, x);
+    this->Q3Points->SetPoint(size, x);
     }
 
   if (nDensity)
@@ -211,15 +214,15 @@ bool vtkPlotBag::Paint(vtkContext2D *painter)
     this->Pen->SetColor(0, 0, 0);
     unsigned char bcolor[4];
     this->Brush->GetColor(bcolor);
-    this->Brush->SetColor(bcolor[0] / 2, bcolor[1] / 2, bcolor[2] / 2);
+    this->Brush->SetColor(pcolor[0] / 2, pcolor[1] / 2, pcolor[2] / 2);
     painter->ApplyPen(this->Pen);
     painter->ApplyBrush(this->Brush);
-    if (this->Q1Points->GetNumberOfPoints() > 0)
+    if (this->Q3Points->GetNumberOfPoints() > 0)
       {
-      painter->DrawPolygon(this->Q1Points);
+      painter->DrawPolygon(this->Q3Points);
       }     
-    this->Brush->SetColor(bcolor);
-    
+
+    this->Brush->SetColor(pcolor);
     painter->ApplyPen(this->Pen);
     painter->ApplyBrush(this->Brush);
     this->Brush->SetOpacity(128);
@@ -228,8 +231,10 @@ bool vtkPlotBag::Paint(vtkContext2D *painter)
       painter->DrawPolygon(this->MedianPoints);
       }
 
+    this->Brush->SetColor(bcolor);
     this->Pen->SetColor(pcolor);
     }
+   
   
   // Let PlotPoints draw the points
   return this->Superclass::Paint(painter);

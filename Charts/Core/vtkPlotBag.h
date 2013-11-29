@@ -38,7 +38,7 @@ class vtkTable;
 class VTKCHARTSCORE_EXPORT vtkPlotBag : public vtkPlotPoints
 {
 public:
-  vtkTypeMacro(vtkPlotBag, vtkPlot);
+  vtkTypeMacro(vtkPlotBag, vtkPlotPoints);
   virtual void PrintSelf(ostream &os, vtkIndent indent);
 
   // Description:
@@ -87,11 +87,11 @@ protected:
   void UpdateTableCache(vtkDataArray*);
 
   vtkPoints2D* MedianPoints;
-  vtkPoints2D* Q1Points;
+  vtkPoints2D* Q3Points;
 
   // Description:
   // The point cache is marked dirty until it has been initialized.
-  vtkTimeStamp BuildTime;
+  //vtkTimeStamp BuildTime;
 
 private:
   vtkPlotBag(const vtkPlotBag &); // Not implemented.

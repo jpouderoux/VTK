@@ -53,7 +53,8 @@ public:
     BAR,
     STACKED,
     BOX,
-    BAG
+    BAG,
+    FUNCTIONALBAG,
     };
 
   // Description:

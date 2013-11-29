@@ -35,6 +35,7 @@
 #include "vtkPlotBag.h"
 #include "vtkPlotBar.h"
 #include "vtkPlotBox.h"
+#include "vtkPlotFunctionalBag.h"
 #include "vtkPlotStacked.h"
 #include "vtkPlotLine.h"
 #include "vtkPlotPoints.h"
@@ -1059,6 +1060,14 @@ vtkPlot * vtkChartXY::AddPlot(int type)
     case BAG:
       {
       vtkPlotBag *bag = vtkPlotBag::New();
+      bag->SetParent(this);
+      bag->GetBrush()->SetColor(color.GetData());
+      plot = bag;
+      break;
+      }
+    case FUNCTIONALBAG:
+      {
+      vtkPlotFunctionalBag *bag = vtkPlotFunctionalBag::New();
       bag->SetParent(this);
       bag->GetBrush()->SetColor(color.GetData());
       plot = bag;

@@ -32,7 +32,7 @@ public:
   void PrintSelf(ostream& os, vtkIndent indent);
 
   // Description:
-  // This flag indicates if a column should be inserted at index 0
+  // This flag indicates if a column must be inserted at index 0
   // with the names (ids) of the input columns. 
   // Default: true
   vtkGetMacro(AddIdColumn, bool);
@@ -40,7 +40,7 @@ public:
   vtkBooleanMacro(AddIdColumn, bool);
 
   // Description:
-  // This flag indicates if the output column should be named using the
+  // This flag indicates if the output column must be named using the
   // names listed in the index 0 column.
   // Default: false
   vtkGetMacro(UseIdColumn, bool);
