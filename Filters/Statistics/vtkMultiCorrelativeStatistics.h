@@ -47,6 +47,9 @@ PURPOSE.  See the above copyright notice for more information.
 //      ColC    |avg(C)   |chol(2,1)|chol(2,2)|cov(C,C)
 //      Cholesky|length(A)|chol(3,1)|chol(3,2)|chol(3,3)
 //   </pre>
+//   The mean point and the covariance matrix can be replaced by the median point and the
+//   MAD matrix (Median Absolute Variance) thanks to the MedianAbosluteVariance boolean.
+//   These changes are used for the robust PCA for instance.
 // * Assess: given a set of results matrices as specified above in input port INPUT_MODEL and
 //   tabular data on input port INPUT_DATA that contains column names matching those
 //   of the tables on input port INPUT_MODEL, the assess mode computes the relative
@@ -57,6 +60,7 @@ PURPOSE.  See the above copyright notice for more information.
 // Thanks to Philippe Pebay, Jackson Mayo, and David Thompson of
 // Sandia National Laboratories for implementing this class.
 // Updated by Philippe Pebay, Kitware SAS 2012
+// Updated by Tristan Coulange and Joachim Pouderoux, Kitware SAS 2013
 
 #ifndef __vtkMultiCorrelativeStatistics_h
 #define __vtkMultiCorrelativeStatistics_h
@@ -64,7 +68,9 @@ PURPOSE.  See the above copyright notice for more information.
 #include "vtkFiltersStatisticsModule.h" // For export macro
 #include "vtkStatisticsAlgorithm.h"
 
+class vtkDoubleArray;
 class vtkMultiBlockDataSet;
+class vtkOrderStatistics;
 class vtkVariant;
 
 class VTKFILTERSSTATISTICS_EXPORT vtkMultiCorrelativeStatistics : public vtkStatisticsAlgorithm
@@ -78,6 +84,14 @@ public:
   // Given a collection of models, calculate aggregate model
   virtual void Aggregate( vtkDataObjectCollection*,
                           vtkMultiBlockDataSet* );
+
+  // Description:
+  // If set to true, the covariance matrix is replaced by
+  // the Median Absolute Variance matrix.
+  // Default is false.
+  vtkSetMacro( MedianAbsoluteVariance, bool );
+  vtkGetMacro( MedianAbsoluteVariance, bool );
+  vtkBooleanMacro( MedianAbsoluteVariance, bool );
 
 protected:
   vtkMultiCorrelativeStatistics();
@@ -103,7 +117,7 @@ protected:
   // Execute the calculations required by the Test option.
   virtual void Test( vtkTable*,
                      vtkMultiBlockDataSet*,
-                     vtkTable* ) { return; };
+                     vtkTable* ) { return; }
 
   //BTX
   // Description:
@@ -113,6 +127,17 @@ protected:
                                     vtkStringArray* rowNames,
                                     AssessFunctor*& dfunc );
   //ETX
+
+  // Description:
+  // Computes the median of inData with vtkOrderStatistics.
+  virtual void ComputeMedian( vtkTable* inData, vtkTable* outData );
+
+  // Description:
+  // Return a new vtkOrderStatistics instance.
+  // Used by derived class to return a derivate class instead.
+  virtual vtkOrderStatistics* CreateOrderStatisticsInstance();
+
+  bool MedianAbsoluteVariance;
 
 private:
   vtkMultiCorrelativeStatistics( const vtkMultiCorrelativeStatistics& ); // Not implemented

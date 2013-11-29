@@ -36,10 +36,15 @@ PURPOSE.  See the above copyright notice for more information.
 //
 // In the test operation, a Jarque-Bera-Srivastava test of n-d normality is performed.
 //
+// This calls Robust PCA can be computed using the MAD (Median Absolute Variance)
+// instead of the default mean by activating the MedianAbsoluteVariance boolean
+// declared in the superclass.
+//
 // .SECTION Thanks
 // Thanks to David Thompson, Philippe Pebay and Jackson Mayo from
 // Sandia National Laboratories for implementing this class.
 // Updated by Philippe Pebay, Kitware SAS 2012
+// Updated by Tristan Coulange and Joachim Pouderoux, Kitware SAS 2013
 
 #ifndef __vtkPCAStatistics_h
 #define __vtkPCAStatistics_h
