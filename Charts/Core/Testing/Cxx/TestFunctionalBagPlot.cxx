@@ -14,12 +14,14 @@
 =========================================================================*/
 
 #include "vtkChartXY.h"
+#include "vtkChartLegend.h"
 #include "vtkContextScene.h"
 #include "vtkContextView.h"
 #include "vtkDoubleArray.h"
 #include "vtkPlotFunctionalBag.h"
 #include "vtkMath.h"
 #include "vtkNew.h"
+#include "vtkPen.h"
 #include "vtkRenderWindow.h"
 #include "vtkRenderWindowInteractor.h"
 #include "vtkStringArray.h"
@@ -37,6 +39,8 @@ int TestFunctionalBagPlot(int, char * [])
   vtkNew<vtkChartXY> chart;
   view->GetScene()->AddItem(chart.GetPointer());
   chart->SetShowLegend(true);
+  chart->GetLegend()->SetHorizontalAlignment(vtkChartLegend::LEFT);
+  chart->GetLegend()->SetVerticalAlignment(vtkChartLegend::TOP);
 
   // Creates an input table  
   const int numCols = 7;
@@ -53,7 +57,7 @@ int TestFunctionalBagPlot(int, char * [])
     inputTable->AddColumn(arr.GetPointer());
     for (int j = 0; j < numVals; j++)
       {
-      arr->SetValue(j, (i+1) * abs(sin(j*(2*vtkMath::Pi())/(float)numVals)) * j + i*20);//rand()/(double)RAND_MAX);  
+      arr->SetValue(j, (i+1) * abs(sin(j*(2*vtkMath::Pi())/(float)numVals)) * j + i*20);  
       }
     }
 
@@ -86,9 +90,9 @@ int TestFunctionalBagPlot(int, char * [])
   vtkNew<vtkPlotFunctionalBag> plot;
   chart->AddPlot(plot.GetPointer());
   plot->SetInputData(inputTable.GetPointer());
-  plot->SetInputDensityData(inputDensityTable.GetPointer(),"Density", "Variable");  
+  plot->SetInputDensityData(inputDensityTable.GetPointer(), "Density", "Variable");  
   plot->SetColor(255, 0, 0, 255);
-  
+    
   // Render the scene  
   view->GetInteractor()->Initialize();
   view->GetInteractor()->Start();

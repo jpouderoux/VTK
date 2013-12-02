@@ -34,7 +34,6 @@
 #include "vtkTable.h"
 
 #include <algorithm>
-#include <map>
 #include <vector>
 
 //-----------------------------------------------------------------------------
@@ -57,14 +56,14 @@ vtkStandardNewMacro(vtkPlotFunctionalBag);
 //-----------------------------------------------------------------------------
 vtkPlotFunctionalBag::vtkPlotFunctionalBag()
 {
-  this->LogX = false;
-  this->LogY = false;
-
   this->Internal = new vtkPlotFuntionalBagInternal(this);
   this->LookupTable = 0;
+  this->LastNearestSerie = 0;
 
   this->MedianPoints = vtkPoints2D::New();
   this->Q3Points = vtkPoints2D::New();
+
+  this->TooltipDefaultLabelFormat = "%l (%x, %y): %z";
 }
 
 //-----------------------------------------------------------------------------
@@ -93,18 +92,18 @@ void vtkPlotFunctionalBag::SetInputData(vtkTable *table)
 
 //-----------------------------------------------------------------------------
 void vtkPlotFunctionalBag::SetInputDensityData(vtkTable *table, 
-                                               const vtkStdString &densityColumn,
-                                               const vtkStdString &variableNameColumn)
+                                               const vtkStdString &densityCol,
+                                               const vtkStdString &varNameCol)
 {
   this->Data->SetInputDataObject(1, table);
   this->Data->SetInputArrayToProcess(3, 1, 0,
                                      vtkDataObject::FIELD_ASSOCIATION_ROWS,
-                                     densityColumn.c_str());
-  if (variableNameColumn != "")
+                                     densityCol.c_str());
+  if (varNameCol != "")
     {
     this->Data->SetInputArrayToProcess(4, 1, 0,
                                        vtkDataObject::FIELD_ASSOCIATION_ROWS,
-                                       variableNameColumn.c_str());
+                                       varNameCol.c_str());
     }
 }
 
@@ -120,19 +119,6 @@ void vtkPlotFunctionalBag::SetInputDensityData(vtkTable *table,
 }
 
 //-----------------------------------------------------------------------------
-class DensityVal
-{
-public:
-  DensityVal(double d, vtkAbstractArray* arr) : Density(d), Array(arr) {}
-  bool operator<(const DensityVal& b)
-  {
-    return this->Density > b.Density;
-  }
-  double Density;
-  vtkAbstractArray* Array;
-};
-
-//-----------------------------------------------------------------------------
 void vtkPlotFunctionalBag::Update()
 {
   if (!this->Visible)
@@ -141,6 +127,8 @@ void vtkPlotFunctionalBag::Update()
     }
   // Check if we have an input
   vtkTable *table = this->Data->GetInput();
+  vtkTable *densityTable = 
+    vtkTable::SafeDownCast(this->Data->GetInputDataObject(1, 0));
 
   if (!table)
     {
@@ -155,88 +143,7 @@ void vtkPlotFunctionalBag::Update()
     vtkDebugMacro(<< "Updating cached values.");
     this->UpdateTableCache(table);
 
-    vtkTable *densityTable = 
-      vtkTable::SafeDownCast(this->Data->GetInputDataObject(1, 0));
-    if (!densityTable)
-      {
-      vtkDebugMacro(<< "Update event called with no input density table set.");
-      return;
-      }
-    vtkDoubleArray *density = vtkDoubleArray::SafeDownCast(
-      this->Data->GetInputAbstractArrayToProcess(3, densityTable));
-    if (!density)
-      {
-      vtkDebugMacro(<< "Update event called with non double density array.");
-      return;
-      }
-
-    vtkStringArray *varName = vtkStringArray::SafeDownCast(
-      this->Data->GetInputAbstractArrayToProcess(4, densityTable));
-    if (!varName)
-      {
-      vtkDebugMacro(<< "Update event called with non double density array.");
-      return;
-      }
-
-    // Fetch and sort arrays according their density
-    std::vector<DensityVal> varNames;
-    for (int i = 0; i < varName->GetNumberOfValues(); i++)
-      {
-      varNames.push_back(
-        DensityVal(density->GetValue(i), table->GetColumnByName(varName->GetValue(i))));
-      }
-
-    std::sort(varNames.begin(), varNames.end());
-    
-    std::vector<vtkAbstractArray*> medianLines;
-    std::vector<vtkAbstractArray*> q3Lines;
-    double sum = 0.0;
-    for (size_t i = 0; i < varNames.size(); i++)
-      {
-      sum += varNames[i].Density;
-      if (sum <= 0.75)
-        {
-        if (sum <= 0.5)
-          {
-          medianLines.push_back(varNames[i].Array);
-          }
-        q3Lines.push_back(varNames[i].Array);
-        }
-      }
-
-    // Generate the quad strip arrays
-    vtkIdType nbRows = table->GetNumberOfRows();
-    this->MedianPoints->Reset();
-    this->MedianPoints->SetNumberOfPoints(2 * nbRows + 0);
-    this->Q3Points->Reset();
-    this->Q3Points->SetNumberOfPoints(2 * nbRows + 0);
-
-    size_t medianCount = medianLines.size();
-    size_t q3Count = q3Lines.size();
-    for (vtkIdType i = 0; i < nbRows; i++)
-      {
-      double vMin = VTK_DOUBLE_MAX;
-      double vMax = VTK_DOUBLE_MIN;
-      for (size_t j = 0; j < medianCount; j++)
-        {
-        double v = medianLines[j]->GetVariantValue(i).ToDouble();
-        if (v < vMin) { vMin = v; }
-        if (v > vMax) { vMax = v; }
-        }
-      this->MedianPoints->SetPoint(2 * i, i, vMin);
-      this->MedianPoints->SetPoint(2 * i + 1, i, vMax);
-
-      vMin = VTK_DOUBLE_MAX;
-      vMax = VTK_DOUBLE_MIN;
-      for (size_t j = 0; j < q3Count; j++)
-        {
-        double v = q3Lines[j]->GetVariantValue(i).ToDouble();
-        if (v < vMin) { vMin = v; }
-        if (v > vMax) { vMax = v; }
-        }
-      this->Q3Points->SetPoint(2*i, i, vMin);
-      this->Q3Points->SetPoint(2*i + 1, i, vMax);
-      }
+    this->UpdateBagsCache(table, densityTable);
     }
 }
 
@@ -270,12 +177,126 @@ bool vtkPlotFunctionalBag::UpdateTableCache(vtkTable *table)
     this->Internal->Lines.push_back(line.GetPointer());
     }
 
+  vtkNew<vtkPlotLine> density;
+  this->AddItem(density.GetPointer());  
+  this->Internal->Lines.push_back(density.GetPointer());
+
   for (unsigned int i = 0; i < this->GetNumberOfItems(); i++)
     {
     vtkPlot::SafeDownCast(this->GetItem(i))->Update();
     }
+
   this->BuildTime.Modified();
 
+  return true;
+}
+
+//-----------------------------------------------------------------------------
+class DensityVal
+{
+public:
+  DensityVal(double d, vtkAbstractArray* arr) : Density(d), Array(arr) {}
+  bool operator<(const DensityVal& b)
+  {
+    return this->Density > b.Density;
+  }
+  double Density;
+  vtkAbstractArray* Array;
+};
+
+//-----------------------------------------------------------------------------
+vtkDoubleArray* vtkPlotFunctionalBag::GetDensityArray()
+{
+  vtkTable* densityTable = 
+    vtkTable::SafeDownCast(this->Data->GetInputDataObject(1, 0));
+  if (!densityTable)
+    {
+    return 0;
+    }
+  return vtkDoubleArray::SafeDownCast(
+    this->Data->GetInputAbstractArrayToProcess(3, densityTable));
+}
+
+//-----------------------------------------------------------------------------
+bool vtkPlotFunctionalBag::UpdateBagsCache(vtkTable* table, vtkTable *densityTable)
+{
+  this->MedianPoints->Reset();
+  this->Q3Points->Reset();
+
+  vtkDoubleArray *density = this->GetDensityArray();
+  if (!density)
+    {
+    vtkDebugMacro(<< "Update event called with non double density array.");
+    return false;
+    }
+
+  vtkStringArray *varName = vtkStringArray::SafeDownCast(
+    this->Data->GetInputAbstractArrayToProcess(4, densityTable));
+  if (!varName)
+    {
+    vtkDebugMacro(<< "Update event called with non double density array.");
+    return false;
+    }
+
+  // Fetch and sort arrays according their density
+  std::vector<DensityVal> varNames;
+  for (int i = 0; i < varName->GetNumberOfValues(); i++)
+    {
+    varNames.push_back(
+      DensityVal(density->GetValue(i), 
+      table->GetColumnByName(varName->GetValue(i))));
+    }
+
+  std::sort(varNames.begin(), varNames.end());
+
+  std::vector<vtkAbstractArray*> medianLines;
+  std::vector<vtkAbstractArray*> q3Lines;
+  double sum = 0.0;
+  for (size_t i = 0; i < varNames.size(); i++)
+    {
+    sum += varNames[i].Density;
+    if (sum <= 0.75)
+      {
+      if (sum <= 0.5)
+        {
+        medianLines.push_back(varNames[i].Array);
+        }
+      q3Lines.push_back(varNames[i].Array);
+      }
+    }
+
+  // Generate the quad strip arrays
+  vtkIdType nbRows = table->GetNumberOfRows();
+    
+  this->MedianPoints->SetNumberOfPoints(2 * nbRows + 0);  
+  this->Q3Points->SetNumberOfPoints(2 * nbRows + 0);
+
+  size_t medianCount = medianLines.size();
+  size_t q3Count = q3Lines.size();
+  for (vtkIdType i = 0; i < nbRows; i++)
+    {
+    double vMin = VTK_DOUBLE_MAX;
+    double vMax = VTK_DOUBLE_MIN;
+    for (size_t j = 0; j < medianCount; j++)
+      {
+      double v = medianLines[j]->GetVariantValue(i).ToDouble();
+      if (v < vMin) { vMin = v; }
+      if (v > vMax) { vMax = v; }
+      }
+    this->MedianPoints->SetPoint(2 * i, i, vMin);
+    this->MedianPoints->SetPoint(2 * i + 1, i, vMax);
+
+    vMin = VTK_DOUBLE_MAX;
+    vMax = VTK_DOUBLE_MIN;
+    for (size_t j = 0; j < q3Count; j++)
+      {
+      double v = q3Lines[j]->GetVariantValue(i).ToDouble();
+      if (v < vMin) { vMin = v; }
+      if (v > vMax) { vMax = v; }
+      }
+    this->Q3Points->SetPoint(2*i, i, vMin);
+    this->Q3Points->SetPoint(2*i + 1, i, vMax);
+    }
   return true;
 }
 
@@ -290,7 +311,7 @@ bool vtkPlotFunctionalBag::Paint(vtkContext2D *painter)
     return false;
     }
 
-  // Let's draw the bags
+  // Draw the 2 bags
   unsigned char pcolor[4];
   double pwidth = this->Pen->GetWidth();
   this->Pen->SetWidth(9);
@@ -319,7 +340,8 @@ bool vtkPlotFunctionalBag::Paint(vtkContext2D *painter)
     }
 
   this->Pen->SetWidth(pwidth);
-
+  
+  // Draw lines
   this->PaintChildren(painter);
 
   return true;
@@ -328,8 +350,31 @@ bool vtkPlotFunctionalBag::Paint(vtkContext2D *painter)
 //-----------------------------------------------------------------------------
 bool vtkPlotFunctionalBag::PaintLegend(vtkContext2D *painter, 
                                        const vtkRectf& rect, int index)
-{
-  this->Internal->Lines[index]->PaintLegend(painter, rect, index);
+{ 
+  if (index == this->Internal->Lines.size() - 1)
+    {
+    vtkNew<vtkPen> blackPen;
+    blackPen->SetWidth(1.0);
+    blackPen->SetColor(0, 0, 0, 255);  
+    painter->ApplyPen(blackPen.GetPointer());
+
+    unsigned char pcolor[4];
+    this->Pen->GetColor(pcolor);
+
+    this->Brush->SetColor(pcolor[0] / 2, pcolor[1] / 2, pcolor[2] / 2);
+    this->Brush->SetOpacity(255);  
+    painter->ApplyBrush(this->Brush);
+    painter->DrawRect(rect[0], rect[1], rect[2]/2, rect[3]);
+
+    this->Brush->SetColor(pcolor);
+    this->Brush->SetOpacity(255);
+    painter->ApplyBrush(this->Brush);
+    painter->DrawRect(rect[0] + rect[2] / 2.f, rect[1], rect[2]/2, rect[3]);
+    }
+  else
+    {
+    this->Internal->Lines[index]->PaintLegend(painter, rect, index);
+    }
   return true;
 }
 
@@ -348,18 +393,102 @@ vtkStringArray* vtkPlotFunctionalBag::GetLabels()
   else if (this->Data->GetInput())
     {
     this->AutoLabels = vtkSmartPointer<vtkStringArray>::New();
-    for (int i = 0; i < this->Internal->Lines.size(); i++)
+    size_t len = this->Internal->Lines.size();
+    for (size_t i = 0; i < len - 1; i++)
       {
       this->AutoLabels->InsertNextValue(this->Internal->Lines[i]->GetLabel());
       }
+    vtkDoubleArray* density = this->GetDensityArray();
+    this->AutoLabels->InsertNextValue(density ? density->GetName() : "Density");
     return this->AutoLabels;
     }
-  else
-    {
-    return NULL;
-    }
+  return NULL;
 }
 
+//-----------------------------------------------------------------------------
+vtkStdString vtkPlotFunctionalBag::GetTooltipLabel(const vtkVector2d &plotPos,
+                                      vtkIdType seriesIndex,
+                                      vtkIdType)
+{
+  vtkStdString tooltipLabel;
+  vtkStdString &format = this->TooltipLabelFormat.empty() ?
+        this->TooltipDefaultLabelFormat : this->TooltipLabelFormat;
+
+  vtkDoubleArray *density = this->GetDensityArray();
+
+  // Parse TooltipLabelFormat and build tooltipLabel
+  bool escapeNext = false;
+  for (size_t i = 0; i < format.length(); ++i)
+    {
+    if (escapeNext)
+      {
+      switch (format[i])
+        {
+        case 'x':
+          tooltipLabel += this->GetNumber(plotPos.GetX(), this->XAxis);
+          break;
+        case 'y':
+          tooltipLabel += this->GetNumber(plotPos.GetY(), this->YAxis);
+          break;
+        case 'z':
+          tooltipLabel += density ? 
+            density->GetVariantValue(seriesIndex).ToString() : "?";
+          break;
+        case 'i':
+          if (this->IndexedLabels &&
+              seriesIndex >= 0 &&
+              seriesIndex < this->IndexedLabels->GetNumberOfTuples())
+            {
+            tooltipLabel += this->IndexedLabels->GetValue(seriesIndex);
+            }
+          break;
+        case 'l':
+          // GetLabel() is GetLabel(0) in this implementation
+          tooltipLabel += this->GetLabel(seriesIndex);
+          break;
+        default: // If no match, insert the entire format tag
+          tooltipLabel += "%";
+          tooltipLabel += format[i];
+          break;
+        }
+      escapeNext = false;
+      }
+    else
+      {
+      if (format[i] == '%')
+        {
+        escapeNext = true;
+        }
+      else
+        {
+        tooltipLabel += format[i];
+        }
+      }
+    }
+  return tooltipLabel;
+}
+
+//-----------------------------------------------------------------------------
+vtkIdType vtkPlotFunctionalBag::GetNearestPoint(const vtkVector2f& point,
+                                                const vtkVector2f& tol,
+                                                vtkVector2f* loc)
+{
+  // Use a small cache mecanism of the last nearest serie found to
+  // accelerate the search
+  size_t nbSeries = this->Internal->Lines.size();
+  vtkIdType s = this->LastNearestSerie % nbSeries;
+  for (unsigned int i = 0; i < this->Internal->Lines.size(); i++)
+    {
+    vtkIdType r = this->Internal->Lines[s]->GetNearestPoint(point, tol, loc);    
+    if (r != -1) 
+      {
+      this->LastNearestSerie = s;
+      return s;
+      }
+    s = (s + 1) % nbSeries;
+   }
+  return -1;
+}
 //-----------------------------------------------------------------------------
 void vtkPlotFunctionalBag::GetBounds(double bounds[4])
 {

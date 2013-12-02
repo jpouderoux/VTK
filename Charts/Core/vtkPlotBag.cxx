@@ -18,13 +18,13 @@
 #include "vtkContextMapper2D.h"
 #include "vtkDataArray.h"
 #include "vtkDoubleArray.h"
-#include "vtkIdTypeArray.h"
 #include "vtkObjectFactory.h"
 #include "vtkPen.h"
 #include "vtkPlotBag.h"
 #include "vtkPoints.h"
 #include "vtkPoints2D.h"
 #include "vtkPointsProjectedHull.h"
+#include "vtkStringArray.h"
 #include "vtkTable.h"
 #include "vtkTimeStamp.h"
 
@@ -38,6 +38,7 @@ vtkPlotBag::vtkPlotBag()
 {
   this->MedianPoints = vtkPoints2D::New();
   this->Q3Points = vtkPoints2D::New();
+  this->TooltipDefaultLabelFormat = "%l (%x, %y): %z";
 }
 
 //-----------------------------------------------------------------------------
@@ -65,11 +66,11 @@ void vtkPlotBag::Update()
 
   // Check if we have an input
   vtkTable *table = this->Data->GetInput();
-  vtkDataArray *bag = vtkDataArray::SafeDownCast(
+  vtkDataArray *density = vtkDataArray::SafeDownCast(
     this->Data->GetInputAbstractArrayToProcess(2, this->GetInput()));
-  if (!table || !bag)
+  if (!table || !density)
     {
-    vtkDebugMacro(<< "Update event called with no input table or bag column set.");
+    vtkDebugMacro(<< "Update event called with no input table or density column set.");
     return;
     } 
   bool update = (this->Data->GetMTime() > this->BuildTime ||
@@ -81,7 +82,7 @@ void vtkPlotBag::Update()
   if (update)
     {
     vtkDebugMacro(<< "Updating cached values.");
-    this->UpdateTableCache(bag);
+    this->UpdateTableCache(density);
     }  
 }
 
@@ -100,6 +101,9 @@ public:
 //-----------------------------------------------------------------------------
 void vtkPlotBag::UpdateTableCache(vtkDataArray* density)
 {
+  this->MedianPoints->Reset();
+  this->Q3Points->Reset();
+
   if (!this->Points) 
     {
     return;
@@ -117,7 +121,7 @@ void vtkPlotBag::UpdateTableCache(vtkDataArray* density)
     }
   
   vtkDoubleArray* nDensity = 0;
-  // Normalize the density array if it is not
+  // Normalize the density array if needed
   if (fabs(sum - 1.0) > 1.0e-12)
     {
     sum = 1.0 / sum;
@@ -156,9 +160,6 @@ void vtkPlotBag::UpdateTableCache(vtkDataArray* density)
       }
     q3Points->InsertNextPoint(x);
     }
-
-  this->MedianPoints->Reset();
-  this->Q3Points->Reset();
 
   // Compute the convex hull for the median points
   if (medianPoints->GetNumberOfPoints() > 0)
@@ -199,56 +200,155 @@ bool vtkPlotBag::Paint(vtkContext2D *painter)
   vtkDebugMacro(<< "Paint event called in vtkPlotBag.");
 
   vtkTable *table = this->Data->GetInput();
-  vtkDataArray *density = vtkDataArray::SafeDownCast(
-    this->Data->GetInputAbstractArrayToProcess(2, this->GetInput()));
+
   if (!this->Visible || !this->Points || !table)
     {
     return false;
     }
-    
-  if (density)
-    {
-    // Let's draw the bags
-    unsigned char pcolor[4];
-    this->Pen->GetColor(pcolor);
-    this->Pen->SetColor(0, 0, 0);
-    unsigned char bcolor[4];
-    this->Brush->GetColor(bcolor);
-    this->Brush->SetColor(pcolor[0] / 2, pcolor[1] / 2, pcolor[2] / 2);
-    painter->ApplyPen(this->Pen);
-    painter->ApplyBrush(this->Brush);
-    if (this->Q3Points->GetNumberOfPoints() > 0)
-      {
-      painter->DrawPolygon(this->Q3Points);
-      }     
-
-    this->Brush->SetColor(pcolor);
-    painter->ApplyPen(this->Pen);
-    painter->ApplyBrush(this->Brush);
-    this->Brush->SetOpacity(128);
-    if (this->MedianPoints->GetNumberOfPoints() > 0)
-      {
-      painter->DrawPolygon(this->MedianPoints);
-      }
-
-    this->Brush->SetColor(bcolor);
-    this->Pen->SetColor(pcolor);
-    }
-   
+     
+  unsigned char pcolor[4];
+  this->Pen->GetColor(pcolor); 
+  unsigned char bcolor[4];
+  this->Brush->GetColor(bcolor);
   
-  // Let PlotPoints draw the points
+  // Draw the 2 bags
+  this->Pen->SetColor(0, 0, 0);
+  this->Brush->SetOpacity(255);
+  this->Brush->SetColor(pcolor[0] / 2, pcolor[1] / 2, pcolor[2] / 2);
+  painter->ApplyPen(this->Pen);
+  painter->ApplyBrush(this->Brush);
+  if (this->Q3Points->GetNumberOfPoints() > 0)
+    {
+    painter->DrawPolygon(this->Q3Points);
+    }     
+
+  this->Brush->SetColor(pcolor);
+  this->Brush->SetOpacity(128);
+  painter->ApplyPen(this->Pen);
+  painter->ApplyBrush(this->Brush);
+  
+  if (this->MedianPoints->GetNumberOfPoints() > 0)
+    {
+    painter->DrawPolygon(this->MedianPoints);
+    }
+
+  this->Brush->SetColor(bcolor);
+  this->Pen->SetColor(pcolor);
+ 
+  // Let PlotPoints draw the points as usual
   return this->Superclass::Paint(painter);
 }
 
 //-----------------------------------------------------------------------------
 bool vtkPlotBag::PaintLegend(vtkContext2D *painter, const vtkRectf& rect, int)
 {
-  painter->ApplyPen(this->Pen);
-  painter->DrawLine(
-    rect[0], rect[1] + 0.5 * rect[3],
-    rect[0] + rect[2], rect[1] + 0.5 * rect[3]);
+  //painter->ApplyPen(this->Pen);
+  //painter->DrawLine(
+  //  rect[0], rect[1] + 0.5 * rect[3],
+  //  rect[0] + rect[2], rect[1] + 0.5 * rect[3]);
+  vtkNew<vtkPen> blackPen;
+  blackPen->SetWidth(1.0);
+  blackPen->SetColor(0, 0, 0, 255);  
+  painter->ApplyPen(blackPen.GetPointer());
+  
+  unsigned char pcolor[4];
+  this->Pen->GetColor(pcolor);
 
-  return this->Superclass::PaintLegend(painter, rect, 0);
+  this->Brush->SetColor(pcolor[0] / 2, pcolor[1] / 2, pcolor[2] / 2);
+  this->Brush->SetOpacity(255);  
+  painter->ApplyBrush(this->Brush);
+  painter->DrawRect(rect[0], rect[1], rect[2]/2, rect[3]);
+
+  this->Brush->SetColor(pcolor);
+  this->Brush->SetOpacity(255);
+  painter->ApplyBrush(this->Brush);
+  painter->DrawRect(rect[0] + rect[2] / 2.f, rect[1], rect[2]/2, rect[3]);
+
+  return true;//this->Superclass::PaintLegend(painter, rect, 0);
+}
+
+//-----------------------------------------------------------------------------
+vtkStringArray* vtkPlotBag::GetLabels()
+{
+  // If the label string is empty, return the y column name
+  if (this->Labels)
+    {
+    return this->Labels;
+    }
+  else if (this->AutoLabels)
+    {
+    return this->AutoLabels;
+    }
+  else if (this->Data->GetInput())
+    {
+    this->AutoLabels = vtkSmartPointer<vtkStringArray>::New();
+    vtkDataArray *density = vtkDataArray::SafeDownCast(
+    this->Data->GetInputAbstractArrayToProcess(2, this->GetInput()));
+    this->AutoLabels->InsertNextValue(density->GetName());    
+    return this->AutoLabels;
+    }
+  return NULL;
+}
+
+//-----------------------------------------------------------------------------
+vtkStdString vtkPlotBag::GetTooltipLabel(const vtkVector2d &plotPos,
+                                      vtkIdType seriesIndex,
+                                      vtkIdType)
+{
+  vtkStdString tooltipLabel;
+  vtkStdString &format = this->TooltipLabelFormat.empty() ?
+        this->TooltipDefaultLabelFormat : this->TooltipLabelFormat;
+  // Parse TooltipLabelFormat and build tooltipLabel
+  bool escapeNext = false;
+  vtkDataArray *density = vtkDataArray::SafeDownCast(
+    this->Data->GetInputAbstractArrayToProcess(2, this->GetInput()));
+  for (size_t i = 0; i < format.length(); ++i)
+    {
+    if (escapeNext)
+      {
+      switch (format[i])
+        {
+        case 'x':
+          tooltipLabel += this->GetNumber(plotPos.GetX(), this->XAxis);
+          break;
+        case 'y':
+          tooltipLabel += this->GetNumber(plotPos.GetY(), this->YAxis);
+          break;
+        case 'z':
+          tooltipLabel += density ? density->GetVariantValue(seriesIndex).ToString() : "?";
+          break;
+        case 'i':
+          if (this->IndexedLabels &&
+              seriesIndex >= 0 &&
+              seriesIndex < this->IndexedLabels->GetNumberOfTuples())
+            {
+            tooltipLabel += this->IndexedLabels->GetValue(seriesIndex);
+            }
+          break;
+        case 'l':
+          // GetLabel() is GetLabel(0) in this implementation
+          tooltipLabel += this->GetLabel();
+          break;
+        default: // If no match, insert the entire format tag
+          tooltipLabel += "%";
+          tooltipLabel += format[i];
+          break;
+        }
+      escapeNext = false;
+      }
+    else
+      {
+      if (format[i] == '%')
+        {
+        escapeNext = true;
+        }
+      else
+        {
+        tooltipLabel += format[i];
+        }
+      }
+    }
+  return tooltipLabel;
 }
 
 //-----------------------------------------------------------------------------

@@ -64,6 +64,18 @@ public:
                            int legendIndex);
 
   // Description:
+  // Get the plot labels. If this array has a length greater than 1 the index
+  // refers to the stacked objects in the plot. See vtkPlotBar for example.
+  virtual vtkStringArray *GetLabels();
+
+  // Description:
+  // Generate and return the tooltip label string for this plot
+  // The segmentIndex parameter is ignored, except for vtkPlotBar
+  virtual vtkStdString GetTooltipLabel(const vtkVector2d &plotPos,
+                                       vtkIdType seriesIndex,
+                                       vtkIdType segmentIndex);
+
+  // Description:
   // Set the input, we are expecting a vtkTable with three columns. The first
   // column and the second represent the x,y position . The five others
   // columns represent the quartiles used to display the box.

@@ -33,52 +33,49 @@ int TestBagPlot(int, char * [])
   view->GetRenderWindow()->SetMultiSamples(0);
   vtkNew<vtkChartXY> chart;
   view->GetScene()->AddItem(chart.GetPointer());
+  chart->SetShowLegend(true);
 
   // Creates a vtkPlotBag input table
   // We construct a 2D grid 20*20.
-  // the bag will represent a square inside of side 5
   int numDataI = 20;
   int numDataJ = 20;
-
-  vtkNew<vtkTable> inputBagPlotTable;
-
+    
   vtkNew<vtkIntArray> arrX;
   arrX->SetName("X");
-  inputBagPlotTable->AddColumn(arrX.GetPointer());
-
+  
   vtkNew<vtkDoubleArray> arrY;
-  arrY->SetName("Y");
-  inputBagPlotTable->AddColumn(arrY.GetPointer());
+  arrY->SetName("Y");  
 
   vtkNew<vtkDoubleArray> arrDensity;
   arrDensity->SetName("Density");
-  inputBagPlotTable->AddColumn(arrDensity.GetPointer());
+  
+  vtkNew<vtkTable> table;
+  table->AddColumn(arrX.GetPointer());
+  table->AddColumn(arrY.GetPointer());
+  table->AddColumn(arrDensity.GetPointer());
 
-  // Test charting with numData Bag plot.
-  inputBagPlotTable->SetNumberOfRows(numDataI * numDataJ);
+  table->SetNumberOfRows(numDataI * numDataJ);
 
-  // Fill inputBagPlotTable
-  // inputBagPlotTable need at least six columns to works
-  // One for the index representing x position and the others
-  // for quartile values.
-
+  // Fill the table
   for (int j = 0; j < numDataJ; ++j)
     {
     for (int i = 0; i < numDataI; ++i)
       {
-      inputBagPlotTable->SetValue(j * numDataI + i, 0, i); //X
-      inputBagPlotTable->SetValue(j * numDataI + i, 1, j); //Y
-      inputBagPlotTable->SetValue(j * numDataI + i, 2, rand()/(double)RAND_MAX); // Density
+      table->SetValue(i + j * numDataI, 0, i); //X
+      table->SetValue(i + j * numDataI, 1, j); //Y
+      double dx = (numDataI / 2. - i) / (numDataI / 2);
+      double dy = (numDataJ / 2. - j) / (numDataJ / 2);
+      double d = 1 - sqrt(dx * dx + dy * dy);
+      table->SetValue(i + j * numDataI, 2, d); // Density      
       }
     }
-  
-  chart->SetShowLegend(true);
-
+    
   vtkNew<vtkPlotBag> bagPlot;
   chart->AddPlot(bagPlot.GetPointer());
-  bagPlot->SetInputData(inputBagPlotTable.GetPointer(), arrX->GetName(),
+  bagPlot->SetInputData(table.GetPointer(), arrX->GetName(),
     arrY->GetName(), arrDensity->GetName());
   bagPlot->SetColor(255, 0, 0, 255);
+  bagPlot->SetMarkerSize(4);  
 
   // Render the scene  
   view->GetInteractor()->Initialize();

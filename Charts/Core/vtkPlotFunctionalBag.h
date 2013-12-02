@@ -29,6 +29,7 @@
 
 class vtkContext2D;
 class vtkContextMapper2D;
+class vtkDoubleArray;
 class vtkPlotFuntionalBagInternal;
 class vtkPoints2D;
 class vtkScalarsToColors;
@@ -96,13 +97,37 @@ public:
   // refers to the stacked objects in the plot. See vtkPlotBar for example.
   virtual vtkStringArray *GetLabels();
 
+  // Description:
+  // Generate and return the tooltip label string for this plot
+  // The segmentIndex parameter is ignored, except for vtkPlotBar
+  virtual vtkStdString GetTooltipLabel(const vtkVector2d &plotPos,
+                                       vtkIdType seriesIndex,
+                                       vtkIdType segmentIndex);
+
+//BTX
+  // Description:
+  // Function to query a plot for the nearest point to the specified coordinate.
+  // Returns the index of the data series with which the point is associated or
+  // -1.
+  virtual vtkIdType GetNearestPoint(const vtkVector2f& point,
+                                    const vtkVector2f& tolerance,
+                                    vtkVector2f* location);
+//ETX
+  // Description:
+  // Helper to get the density column array from the density table.
+  vtkDoubleArray* GetDensityArray();
+
 protected:
   vtkPlotFunctionalBag();
   ~vtkPlotFunctionalBag();
 
   // Description:
   // Update the table cache.
-  bool UpdateTableCache(vtkTable *table);
+  bool UpdateTableCache(vtkTable*);
+  
+  // Description:
+  // Update bag polygons cache.
+  bool UpdateBagsCache(vtkTable*, vtkTable*);
   
   // Description:
   // The cache is marked dirty until it has been initialized.
@@ -114,10 +139,10 @@ protected:
   // Lookup Table for coloring points by scalar value
   vtkScalarsToColors *LookupTable;
 
-  bool LogX, LogY;
-
   vtkPoints2D *MedianPoints;
   vtkPoints2D *Q3Points;
+
+  vtkIdType LastNearestSerie;
 
 private:
   vtkPlotFunctionalBag(const vtkPlotFunctionalBag &); // Not implemented.
