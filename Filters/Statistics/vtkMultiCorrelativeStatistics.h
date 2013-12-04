@@ -69,6 +69,7 @@ PURPOSE.  See the above copyright notice for more information.
 
 class vtkDoubleArray;
 class vtkMultiBlockDataSet;
+class vtkOrderStatistics;
 class vtkVariant;
 
 class VTKFILTERSSTATISTICS_EXPORT vtkMultiCorrelativeStatistics : public vtkStatisticsAlgorithm
@@ -86,8 +87,10 @@ public:
   // Description:
   // If set to true, the covariance matrix is replaced by
   // the Median Absolute Variance matrix.
-  vtkSetMacro(MedianAbosluteVariance,bool);
-  vtkGetMacro(MedianAbosluteVariance,bool);
+  // Default is false.
+  vtkSetMacro( MedianAbsoluteVariance, bool );
+  vtkGetMacro( MedianAbsoluteVariance, bool );
+  vtkBooleanMacro( MedianAbsoluteVariance, bool );
 
 protected:
   vtkMultiCorrelativeStatistics();
@@ -113,7 +116,7 @@ protected:
   // Execute the calculations required by the Test option.
   virtual void Test( vtkTable*,
                      vtkMultiBlockDataSet*,
-                     vtkTable* ) { return; };
+                     vtkTable* ) { return; }
 
   //BTX
   // Description:
@@ -126,9 +129,14 @@ protected:
 
   // Description:
   // Computes the median of inData with vtkOrderStatistics.
-  virtual void ComputeMedian(vtkTable* inData, vtkTable* outData);
+  virtual void ComputeMedian( vtkTable* inData, vtkTable* outData );
 
-  bool MedianAbosluteVariance;
+  // Description:
+  // Return a new vtkOrderStatistics instance.
+  // Used by derived class to return a derivate class instead.
+  virtual vtkOrderStatistics* CreateOrderStatisticsInstance();
+
+  bool MedianAbsoluteVariance;
 
 private:
   vtkMultiCorrelativeStatistics( const vtkMultiCorrelativeStatistics& ); // Not implemented

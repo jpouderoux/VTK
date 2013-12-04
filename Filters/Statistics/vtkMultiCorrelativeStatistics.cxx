@@ -11,7 +11,6 @@
 #include "vtkNew.h"
 #include "vtkObjectFactory.h"
 #include "vtkOrderStatistics.h"
-#include "vtkSmartPointer.h"
 #include "vtkStatisticsAlgorithmPrivate.h"
 #include "vtkStringArray.h"
 #include "vtkTable.h"
@@ -34,7 +33,7 @@ vtkMultiCorrelativeStatistics::vtkMultiCorrelativeStatistics()
 {
   this->AssessNames->SetNumberOfValues( 1 );
   this->AssessNames->SetValue( 0, "d^2" ); // Squared Mahalanobis distance
-  this->MedianAbosluteVariance = false;
+  this->MedianAbsoluteVariance = false;
 }
 
 // ----------------------------------------------------------------------
@@ -393,7 +392,7 @@ void vtkMultiCorrelativeStatistics::Learn( vtkTable* inData,
   //  Row 0: cardinality of sample
   //  Rows 1 to m - 1: means of each variable
   //  Rows m to m + colPairs.size(): variances/covariances for each pair of variables
-  col3->SetNumberOfTuples( 1 + m + colPairs.size() ); 
+  col3->SetNumberOfTuples( 1 + m + colPairs.size() );
   col3->FillComponent( 0, 0. );
 
   // Retrieve pointer to values and skip Cardinality entry
@@ -401,7 +400,7 @@ void vtkMultiCorrelativeStatistics::Learn( vtkTable* inData,
   *rv = static_cast<double>( nRow );
   ++ rv;
 
-  if ( this->MedianAbosluteVariance )
+  if ( this->MedianAbsoluteVariance )
     {
     // Computes the Median
     vtkNew<vtkTable> medianTable;
@@ -424,10 +423,10 @@ void vtkMultiCorrelativeStatistics::Learn( vtkTable* inData,
 
       vtksys_ios::ostringstream nameStr;
       nameStr << "Cov{" << j << "," << k << "}";
-      vtkSmartPointer<vtkDoubleArray> col = vtkSmartPointer<vtkDoubleArray>::New();
+      vtkNew<vtkDoubleArray> col;
       col->SetNumberOfTuples( nRow );
       col->SetName( nameStr.str().c_str() );
-      inDataMAD->AddColumn( col );
+      inDataMAD->AddColumn( col.GetPointer() );
       // Iterate over rows
       for ( i = 0; i < nRow; ++ i )
         {
@@ -439,7 +438,7 @@ void vtkMultiCorrelativeStatistics::Learn( vtkTable* inData,
       }
     // Computes the MAD matrix
     vtkNew<vtkTable> MADTable;
-    this->ComputeMedian(inDataMAD.GetPointer(), MADTable.GetPointer());
+    this->ComputeMedian( inDataMAD.GetPointer(), MADTable.GetPointer() );
     // Sets the MAD
     x = rv + m;
     // Iterate over column pairs
@@ -573,7 +572,7 @@ void vtkMultiCorrelativeStatistics::Derive( vtkMultiBlockDataSet* outMeta )
 
   // Loop over requests
   double scale = 1. / ( n - 1 ); // n -1 for unbiased variance estimators
-  for ( reqIt = this->Internals->Requests.begin(); 
+  for ( reqIt = this->Internals->Requests.begin();
         reqIt != this->Internals->Requests.end(); ++ reqIt, ++ b )
     {
     vtkStringArray* colNames = vtkStringArray::New();
@@ -627,7 +626,7 @@ void vtkMultiCorrelativeStatistics::Derive( vtkMultiBlockDataSet* outMeta )
     outMeta->SetBlock( b, covariance );
 
     // Clean up
-    covariance->Delete(); 
+    covariance->Delete();
     colNames->Delete();
     colAvgs->Delete();
 
@@ -760,13 +759,14 @@ void vtkMultiCorrelativeStatistics::Assess( vtkTable* inData,
 // ----------------------------------------------------------------------
 void vtkMultiCorrelativeStatistics::ComputeMedian(vtkTable* inData, vtkTable* outData)
 {
-  vtkNew<vtkOrderStatistics> orderStats;
+  vtkOrderStatistics* orderStats = this->CreateOrderStatisticsInstance();
   vtkNew<vtkTable> inOrderStats;
-  orderStats->SetInputData(vtkStatisticsAlgorithm::INPUT_DATA, inOrderStats.GetPointer());
-  for (vtkIdType i = 0; i < inData->GetNumberOfColumns(); ++ i )
+  orderStats->SetInputData( vtkStatisticsAlgorithm::INPUT_DATA,
+    inOrderStats.GetPointer() );
+  for (vtkIdType i = 0; i < inData->GetNumberOfColumns(); ++i )
     {
-    inOrderStats->AddColumn(inData->GetColumn(i));
-    orderStats->AddColumn(inData->GetColumn(i)->GetName());
+    inOrderStats->AddColumn( inData->GetColumn(i) );
+    orderStats->AddColumn( inData->GetColumn(i)->GetName() );
     }
   orderStats->SetNumberOfIntervals(2);
   orderStats->SetLearnOption(true);
@@ -774,13 +774,20 @@ void vtkMultiCorrelativeStatistics::ComputeMedian(vtkTable* inData, vtkTable* ou
   orderStats->SetTestOption(false);
   orderStats->SetAssessOption(false);
   orderStats->Update();
-  // Gets the Median
-  vtkMultiBlockDataSet* outputOrderStats = vtkMultiBlockDataSet::SafeDownCast(
-    orderStats->GetOutputDataObject(vtkStatisticsAlgorithm::OUTPUT_MODEL));
-  outData->DeepCopy(vtkTable::SafeDownCast(
-    outputOrderStats->GetBlock(outputOrderStats->GetNumberOfBlocks() - 1)));
 
-  return ;
+  // Get the Median
+  vtkMultiBlockDataSet* outputOrderStats = vtkMultiBlockDataSet::SafeDownCast(
+    orderStats->GetOutputDataObject( vtkStatisticsAlgorithm::OUTPUT_MODEL ) );
+  outData->ShallowCopy( vtkTable::SafeDownCast(
+    outputOrderStats->GetBlock( outputOrderStats->GetNumberOfBlocks() - 1) ) );
+
+  orderStats->Delete();
+}
+
+// ----------------------------------------------------------------------
+vtkOrderStatistics* vtkMultiCorrelativeStatistics::CreateOrderStatisticsInstance()
+{
+  return vtkOrderStatistics::New();
 }
 
 // ----------------------------------------------------------------------

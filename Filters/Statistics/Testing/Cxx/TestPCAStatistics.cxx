@@ -32,8 +32,8 @@ bool fuzzyCompare(A a, A b) {
 int TestPCA(int argc, char* argv[]);
 int TestPCARobust(int argc, char* argv[]);
 int TestPCAPart(int argc, char* argv[], bool RobustPCA);
-int TestPCARobust2(int argc, char* argv[]);
-bool TestEigen();
+int TestPCARobust2();
+int TestEigen();
 
 //=============================================================================
 int TestPCAStatistics(int argc, char* argv[])
@@ -42,7 +42,7 @@ int TestPCAStatistics(int argc, char* argv[])
 
   result |= TestPCA(argc, argv);
   result |= TestPCARobust(argc, argv);
-  result |= TestPCARobust2(argc, argv);
+  result |= TestPCARobust2();
   result |= TestEigen();
 
   if ( result == EXIT_FAILURE )
@@ -70,53 +70,47 @@ int TestPCARobust(int argc, char* argv[])
 }
 
 //=============================================================================
-int TestPCARobust2(int argc, char* argv[])
+int TestPCARobust2()
 {
-  int testStatus = 0;
-
+  const int nVals = 7;
   double mingledData[] =
     {
-    0, 1,
-    1, 1,
-    2, 1,
-    3, 1,
-    4, 1,
-    5, 1,
-    10, 10
+    0., 1.,
+    1., 1.,
+    2., 1.,
+    3., 1.,
+    4., 1.,
+    5., 1.,
+    10., 10.
     };
-  int nVals = 7;
 
   const char m0Name[] = "M0";
-  vtkDoubleArray* dataset1Arr = vtkDoubleArray::New();
+  vtkNew<vtkDoubleArray> dataset1Arr;
   dataset1Arr->SetNumberOfComponents( 1 );
   dataset1Arr->SetName( m0Name );
 
   const char m1Name[] = "M1";
-  vtkDoubleArray* dataset2Arr = vtkDoubleArray::New();
+  vtkNew<vtkDoubleArray> dataset2Arr;
   dataset2Arr->SetNumberOfComponents( 1 );
   dataset2Arr->SetName( m1Name );
 
   for ( int i = 0; i < nVals; ++ i )
     {
-    int ti = i << 1;
-    dataset1Arr->InsertNextValue( mingledData[ti] );
-    dataset2Arr->InsertNextValue( mingledData[ti + 1] );
+    dataset1Arr->InsertNextValue( mingledData[i * 2] );
+    dataset2Arr->InsertNextValue( mingledData[i * 2 + 1] );
     }
 
-  vtkTable* datasetTable = vtkTable::New();
-  datasetTable->AddColumn( dataset1Arr );
-  dataset1Arr->Delete();
-  datasetTable->AddColumn( dataset2Arr );
-  dataset2Arr->Delete();
+  vtkNew<vtkTable> datasetTable;
+  datasetTable->AddColumn( dataset1Arr.GetPointer() );
+  datasetTable->AddColumn( dataset2Arr.GetPointer() );
 
   // Set PCA statistics algorithm and its input data port
-  vtkPCAStatistics* pcas = vtkPCAStatistics::New();
+  vtkNew<vtkPCAStatistics> pcas;
 
   // Prepare first test with data
-  pcas->SetInputData( vtkStatisticsAlgorithm::INPUT_DATA, datasetTable );
-  pcas->SetMedianAbosluteVariance(true);
-
-  datasetTable->Delete();
+  pcas->SetInputData( vtkStatisticsAlgorithm::INPUT_DATA,
+    datasetTable.GetPointer() );
+  pcas->MedianAbsoluteVarianceOn();
 
   // -- Select Column Pairs of Interest ( Learn Mode ) --
   pcas->SetColumnStatus( m0Name, 1 );
@@ -134,22 +128,21 @@ int TestPCARobust2(int argc, char* argv[])
   double res[] = { -3.0, -2.0, -1.0, 0.0, 1.0, 2.0, 7.0,
                     0.0,  0.0,  0.0, 0.0, 0.0, 0.0, 9.0 };
 
-  for (vtkIdType j = 0; j < 2; j++)
+  for ( vtkIdType j = 0; j < 2; j++ )
     {
-    for (vtkIdType i = 0; i < 7; i++)
+    for ( vtkIdType i = 0; i < 7; i++ )
       {
-      if( outputData->GetValue(i, j+2) != res[j*outputData->GetNumberOfRows()+i] )
+      if ( outputData->GetValue(i, j+2) !=
+        res[ j * outputData->GetNumberOfRows() + i ] )
         {
         return EXIT_FAILURE;
         }
       }
     }
 
-  pcas->Delete();
-
-  return testStatus;
+  return EXIT_SUCCESS;
 }
-  
+
 //=============================================================================
 int TestPCAPart(int argc, char* argv[], bool robustPCA)
 {
@@ -228,8 +221,8 @@ int TestPCAPart(int argc, char* argv[], bool robustPCA)
 
   // Set PCA statistics algorithm and its input data port
   vtkPCAStatistics* pcas = vtkPCAStatistics::New();
-  pcas->SetMedianAbosluteVariance(robustPCA);
-  
+  pcas->SetMedianAbsoluteVariance( robustPCA );
+
   // First verify that absence of input does not cause trouble
   cout << "## Verifying that absence of input does not cause trouble... ";
   pcas->Update();
@@ -365,7 +358,7 @@ int TestPCAPart(int argc, char* argv[], bool robustPCA)
   return testStatus;
 }
 
-bool TestEigen()
+int TestEigen()
 {
   const char m0Name[] = "M0";
   vtkSmartPointer<vtkDoubleArray> dataset1Arr =
