@@ -5,6 +5,7 @@ set(Module_SRCS
   vtkContingencyStatistics.cxx
   vtkCorrelativeStatistics.cxx
   vtkDescriptiveStatistics.cxx
+  vtkExtractFunctionalBagPlot.cxx
   vtkHighestDensityRegionsStatistics.cxx
   vtkKMeansDistanceFunctorCalculator.cxx
   vtkKMeansDistanceFunctor.cxx

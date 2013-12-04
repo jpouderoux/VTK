@@ -18,8 +18,8 @@
 // .SECTION Description
 // This class allows to draw a bagplot given three columns from
 // a vtkTable. The first two columns will represent X,Y as it is for
-// vtkPlotPoints. The third one will have to specify if the point belongs  
-// to a bag polygon, if so the forth colum specifiy the point order in 
+// vtkPlotPoints. The third one will have to specify if the point belongs
+// to a bag polygon, if so the forth colum specifiy the point order in
 // the line.
 
 #ifndef __vtkPlotBag_h
@@ -50,7 +50,7 @@ public:
   // The scene should take care of calling this on all items before their
   // Paint function is invoked.
   virtual void Update();
-  
+
   // Description:
   // Paint event for the XY plot, called whenever the chart needs to be drawn.
   virtual bool Paint(vtkContext2D *painter);
@@ -95,7 +95,7 @@ public:
 protected:
   vtkPlotBag();
   ~vtkPlotBag();
-  
+
   void UpdateTableCache(vtkDataArray*);
 
   vtkPoints2D* MedianPoints;

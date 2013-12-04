@@ -47,13 +47,13 @@ class vtkTransposeTableInternal
 {
 public:
   vtkTransposeTableInternal(vtkTransposeTable* parent) : Parent(parent) {}
-    
+
   bool TransposeTable(vtkTable* inTable, vtkTable* outTable);
 
 protected:
 
   bool InsertColumn(int, vtkAbstractArray*);
-  
+
   template<typename ArrayType, typename ValueType>
   bool TransposeColumn(int, bool);
 
@@ -76,7 +76,7 @@ bool vtkTransposeTableInternal::TransposeColumn(int columnId, bool useVariant)
 
   int numberOfRowsInTransposedColumn = this->InTable->GetNumberOfColumns();
   if (this->Parent->GetUseIdColumn())
-    {    
+    {
     columnId--;
     numberOfRowsInTransposedColumn--;
     }
@@ -113,8 +113,8 @@ bool vtkTransposeTableInternal::TransposeColumn(int columnId, bool useVariant)
 //----------------------------------------------------------------------------
 bool vtkTransposeTableInternal::InsertColumn(int pos, vtkAbstractArray* col)
 {
-  if (!col || ((this->OutTable->GetNumberOfRows() != 
-    col->GetNumberOfComponents() * col->GetNumberOfTuples()) && 
+  if (!col || ((this->OutTable->GetNumberOfRows() !=
+    col->GetNumberOfComponents() * col->GetNumberOfTuples()) &&
     (this->OutTable->GetNumberOfRows() != 0)))
     {
     return false;
@@ -143,7 +143,7 @@ bool vtkTransposeTableInternal::InsertColumn(int pos, vtkAbstractArray* col)
 }
 
 //----------------------------------------------------------------------------
-bool vtkTransposeTableInternal::TransposeTable(vtkTable* inTable, 
+bool vtkTransposeTableInternal::TransposeTable(vtkTable* inTable,
                                                vtkTable* outTable)
 {
   this->InTable = inTable;
@@ -156,7 +156,7 @@ bool vtkTransposeTableInternal::TransposeTable(vtkTable* inTable,
   vtkAbstractArray* firstCol = this->InTable->GetColumn(idColOffset);
   for (int c = idColOffset; c < this->InTable->GetNumberOfColumns(); c++)
     {
-    if (strcmp(firstCol->GetClassName(), 
+    if (strcmp(firstCol->GetClassName(),
       this->InTable->GetColumn(c)->GetClassName()) != 0)
       {
       useVariant = true;
@@ -175,7 +175,8 @@ bool vtkTransposeTableInternal::TransposeTable(vtkTable* inTable,
 #define TransposeTypedColumn(_vt, _ta, _t) \
   case _vt: \
     if (!this->TransposeColumn<_ta, _t>(c, useVariant))\
-      { vtkErrorWithObjectMacro(this->Parent, << "Unable to transpose column " << c); return false; }\
+      { vtkErrorWithObjectMacro(this->Parent, <<\
+      "Unable to transpose column " << c); return false; }\
     break;
 
       switch (column->GetDataType())
@@ -213,10 +214,10 @@ bool vtkTransposeTableInternal::TransposeTable(vtkTable* inTable,
 
   // Set id column on transposed table
   firstCol = this->InTable->GetColumn(0);
-  for (int r = 0; r < firstCol->GetNumberOfComponents() * 
+  for (int r = 0; r < firstCol->GetNumberOfComponents() *
     firstCol->GetNumberOfTuples(); r++)
     {
-    vtkAbstractArray* destColumn = this->OutTable->GetColumn(r);    
+    vtkAbstractArray* destColumn = this->OutTable->GetColumn(r);
     if (this->Parent->GetUseIdColumn())
       {
       destColumn->SetName(firstCol->GetVariantValue(r).ToString());
@@ -233,7 +234,7 @@ bool vtkTransposeTableInternal::TransposeTable(vtkTable* inTable,
   if (this->Parent->GetAddIdColumn())
     {
     vtkNew<vtkStringArray> stringArray;
-    stringArray->SetName(this->Parent->GetUseIdColumn() ? 
+    stringArray->SetName(this->Parent->GetUseIdColumn() ?
       this->InTable->GetColumn(0)->GetName() : this->Parent->GetIdColumnName());
     stringArray->SetNumberOfValues(
       this->InTable->GetNumberOfColumns() - idColOffset);
@@ -270,17 +271,16 @@ void vtkTransposeTable::PrintSelf(ostream& os, vtkIndent indent)
 }
 
 //----------------------------------------------------------------------------
-int vtkTransposeTable::RequestData(
-  vtkInformation*,
-  vtkInformationVector** inputVector,
-  vtkInformationVector* outputVector)
+int vtkTransposeTable::RequestData(vtkInformation*,
+                                   vtkInformationVector** inputVector,
+                                   vtkInformationVector* outputVector)
 {
   vtkTable* inTable = vtkTable::GetData(inputVector[0]);
   vtkTable* outTable = vtkTable::GetData(outputVector, 0);
-  
+
   if (inTable->GetNumberOfColumns() == 0)
     {
-    vtkErrorMacro(<< 
+    vtkErrorMacro(<<
       "vtkTransposeTable requires vtkTable containing at least one column.");
     return 0;
     }

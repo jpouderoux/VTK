@@ -13,27 +13,30 @@
 
 =========================================================================*/
 
-// .NAME vtkPlotFunctionalBag - Class for drawing an XY line functional 
-// bag plot given an input vtkTable.
+// .NAME vtkPlotFunctionalBag - Class for drawing an XY line plot or bag
+// given two columns from a vtkTable.
 //
 // .SECTION Description
+// Depending on the number of components, this class will draw either
+// a line plot (for 1 component column) or, for two components columns,
+// a filled polygonal band (the bag) going from the first to the second
+// component on the Y-axis along the X-axis. The filter
+// vtkExtractFunctionalBagPlot is intended to create such "bag" columns.
 //
+// .SECTION See Also
+// vtkExtractFunctionalBagPlot
 
 #ifndef __vtkPlotFunctionalBag_h
 #define __vtkPlotFunctionalBag_h
 
 #include "vtkChartsCoreModule.h" // For export macro
 #include "vtkPlot.h"
-#include "vtkSmartPointer.h"     // Needed to hold SP ivars
-#include "vtkRect.h"             // For vtkRectd ivar
+#include "vtkPlotLine.h"
+#include "vtkNew.h"              // Needed to hold SP ivars
 
-class vtkContext2D;
-class vtkContextMapper2D;
-class vtkDoubleArray;
 class vtkPlotFuntionalBagInternal;
 class vtkPoints2D;
 class vtkScalarsToColors;
-class vtkTable;
 
 class VTKCHARTSCORE_EXPORT vtkPlotFunctionalBag : public vtkPlot
 {
@@ -62,7 +65,7 @@ public:
   // and 3). The plot can choose how to fill the space supplied.
   virtual bool PaintLegend(vtkContext2D *painter, const vtkRectf& rect,
                            int legendIndex);
-                           
+
                            // Description:
   // Get the bounds for this plot as (Xmin, Xmax, Ymin, Ymax).
   virtual void GetBounds(double bounds[4]);
@@ -70,17 +73,6 @@ public:
   // Description:
   // Get the non-log-scaled bounds on chart inputs for this plot as (Xmin, Xmax, Ymin, Ymax).
   virtual void GetUnscaledInputBounds(double bounds[4]);
-
-  // Description:
-  // This is a convenience function to set the input table for the plot.
-  virtual void SetInputData(vtkTable *table);
-  
-  // Description:
-  // This is a convenience function to set the input density table and column for the plot.  
-  virtual void SetInputDensityData(vtkTable *table, const vtkStdString &densityColumn, 
-    const vtkStdString &variableNameColumn = "");
-  virtual void SetInputDensityData(vtkTable *table, vtkIdType densityColumn, 
-    vtkIdType variableNameColumn = -1);
 
   // Description:
   // Specify a lookup table for the mapper to use.
@@ -91,18 +83,6 @@ public:
   // Create default lookup table. Generally used to create one when none
   // is available with the scalar data.
   virtual void CreateDefaultLookupTable();
-  
-  // Description:
-  // Get the plot labels. If this array has a length greater than 1 the index
-  // refers to the stacked objects in the plot. See vtkPlotBar for example.
-  virtual vtkStringArray *GetLabels();
-
-  // Description:
-  // Generate and return the tooltip label string for this plot
-  // The segmentIndex parameter is ignored, except for vtkPlotBar
-  virtual vtkStdString GetTooltipLabel(const vtkVector2d &plotPos,
-                                       vtkIdType seriesIndex,
-                                       vtkIdType segmentIndex);
 
 //BTX
   // Description:
@@ -113,36 +93,36 @@ public:
                                     const vtkVector2f& tolerance,
                                     vtkVector2f* location);
 //ETX
-  // Description:
-  // Helper to get the density column array from the density table.
-  vtkDoubleArray* GetDensityArray();
 
 protected:
   vtkPlotFunctionalBag();
   ~vtkPlotFunctionalBag();
 
   // Description:
+  // Populate the data arrays ready to operate on input data.
+  bool GetDataArrays(vtkTable *table, vtkDataArray *array[2]);
+
+  // Description:
   // Update the table cache.
   bool UpdateTableCache(vtkTable*);
-  
-  // Description:
-  // Update bag polygons cache.
-  bool UpdateBagsCache(vtkTable*, vtkTable*);
-  
+
   // Description:
   // The cache is marked dirty until it has been initialized.
   vtkTimeStamp BuildTime;
-
-  vtkPlotFuntionalBagInternal* Internal;
 
   // Description:
   // Lookup Table for coloring points by scalar value
   vtkScalarsToColors *LookupTable;
 
-  vtkPoints2D *MedianPoints;
-  vtkPoints2D *Q3Points;
+  // Description:
+  // The plot line delegate for line series
+  vtkNew<vtkPlotLine> Line;
 
-  vtkIdType LastNearestSerie;
+  // Description:
+  // The bag points ordered in quadstrip fashion
+  vtkNew<vtkPoints2D> BagPoints;
+
+  bool LogX, LogY;
 
 private:
   vtkPlotFunctionalBag(const vtkPlotFunctionalBag &); // Not implemented.

@@ -18,6 +18,7 @@
 #include "vtkContextScene.h"
 #include "vtkContextView.h"
 #include "vtkDoubleArray.h"
+#include "vtkLookupTable.h"
 #include "vtkPlotFunctionalBag.h"
 #include "vtkMath.h"
 #include "vtkNew.h"
@@ -26,13 +27,66 @@
 #include "vtkRenderWindowInteractor.h"
 #include "vtkStringArray.h"
 #include "vtkTable.h"
-
 #include <sstream>
 
 //----------------------------------------------------------------------------
 int TestFunctionalBagPlot(int, char * [])
 {
-  // Set up a 2D scene, add an XY chart to it
+  // Creates an input table
+  const int numCols = 7;
+  const int numVals = 100;
+
+  vtkNew<vtkTable> inputTable;
+  vtkNew<vtkDoubleArray> arr[numCols];
+  for (int i = 0; i < numCols; i++)
+    {
+    std::stringstream ss;
+    ss << "Y" << i;
+    arr[i]->SetName(ss.str().c_str());
+    arr[i]->SetNumberOfValues(numVals);
+    for (int j = 0; j < numVals; j++)
+      {
+      arr[i]->SetValue(j, (i+1) * abs(sin(j*(2*vtkMath::Pi())/(float)numVals)) * j + i*20);
+      }
+    inputTable->AddColumn(arr[i].GetPointer());
+    }
+
+  // Create a X-axis column
+  vtkNew<vtkDoubleArray> xArr;
+  xArr->SetName("X");
+  xArr->SetNumberOfValues(numVals);
+  for (int j = 0; j < numVals; j++)
+    {
+    xArr->SetValue(j, j * 2.0);
+    }
+  inputTable->AddColumn(xArr.GetPointer());
+
+  // Create the bag columns
+  vtkNew<vtkDoubleArray> q3Arr;
+  q3Arr->SetName("Q3");
+  q3Arr->SetNumberOfComponents(2);
+  q3Arr->SetNumberOfTuples(numVals);
+  vtkNew<vtkDoubleArray> q2Arr;
+  q2Arr->SetName("Q2");
+  q2Arr->SetNumberOfComponents(2);
+  q2Arr->SetNumberOfTuples(numVals);
+
+  for (int i = 0; i < numVals; i++)
+    {
+    double v0, v1;
+    v0 = arr[1]->GetVariantValue(i).ToFloat();
+    v1 = arr[5]->GetVariantValue(i).ToFloat();
+    q3Arr->SetTuple2(i, v0, v1);
+
+    v0 = arr[2]->GetVariantValue(i).ToFloat();
+    v1 = arr[4]->GetVariantValue(i).ToFloat();
+    q2Arr->SetTuple2(i, v0, v1);
+    }
+
+  inputTable->AddColumn(q3Arr.GetPointer());
+  inputTable->AddColumn(q2Arr.GetPointer());
+
+  // Set up a 2D scene and add an XY chart to it
   vtkNew<vtkContextView> view;
   view->GetRenderWindow()->SetSize(400, 400);
   view->GetRenderWindow()->SetMultiSamples(0);
@@ -42,58 +96,33 @@ int TestFunctionalBagPlot(int, char * [])
   chart->GetLegend()->SetHorizontalAlignment(vtkChartLegend::LEFT);
   chart->GetLegend()->SetVerticalAlignment(vtkChartLegend::TOP);
 
-  // Creates an input table  
-  const int numCols = 7;
-  const int numVals = 100; 
+  // Create the functional bag plots
+  vtkNew<vtkPlotFunctionalBag> q3Plot;
+  q3Plot->SetColor(0.5, 0, 0);
+  q3Plot->SetInputData(inputTable.GetPointer(), "X", "Q3");
+  chart->AddPlot(q3Plot.GetPointer());
 
-  vtkNew<vtkTable> inputTable;
-  for (int i = 0; i < numCols; i++)
-    {
-    vtkNew<vtkDoubleArray> arr;
-    std::stringstream ss;
-    ss << "Y" << i;
-    arr->SetName(ss.str().c_str());
-    arr->SetNumberOfValues(numVals);
-    inputTable->AddColumn(arr.GetPointer());
-    for (int j = 0; j < numVals; j++)
-      {
-      arr->SetValue(j, (i+1) * abs(sin(j*(2*vtkMath::Pi())/(float)numVals)) * j + i*20);  
-      }
-    }
+  vtkNew<vtkPlotFunctionalBag> q2Plot;
+  q2Plot->SetColor(1., 0, 0);
+  q2Plot->SetInputData(inputTable.GetPointer(), "X", "Q2");
+  chart->AddPlot(q2Plot.GetPointer());
 
-  vtkNew<vtkTable> inputDensityTable;
-  vtkNew<vtkDoubleArray> arr;
-  arr->SetName("Density");
-  arr->SetNumberOfValues(numCols);
-  arr->SetValue(0, 0.08);
-  arr->SetValue(1, 0.08);
-  arr->SetValue(2, 0.12);
-  arr->SetValue(3, 0.25);
-  arr->SetValue(4, 0.25);
-  arr->SetValue(5, 0.12);
-  arr->SetValue(6, 0.08);
-
-  inputDensityTable->AddColumn(arr.GetPointer());
-  
-  vtkNew<vtkStringArray> varArr;
-  varArr->SetName("Variable");
-  varArr->SetNumberOfValues(numCols);
+  vtkNew<vtkLookupTable> lookup;
+  lookup->SetNumberOfColors(numCols);
+  lookup->SetRange(0, numCols-1);
+  lookup->Build();
   for (int j = 0; j < numCols; j++)
     {
-    std::stringstream ss;
-    ss << "Y" << j;
-    varArr->SetValue(j, ss.str().c_str());
+    vtkNew<vtkPlotFunctionalBag> plot;
+    double rgb[3];
+    lookup->GetColor(j, rgb);
+    plot->SetColor(rgb[0], rgb[1], rgb[2]);
+    plot->SetInputData(inputTable.GetPointer(), "X",
+      inputTable->GetColumn(j)->GetName());
+    chart->AddPlot(plot.GetPointer());
     }
-  inputDensityTable->AddColumn(varArr.GetPointer());
 
-  // Create the functional bag plot
-  vtkNew<vtkPlotFunctionalBag> plot;
-  chart->AddPlot(plot.GetPointer());
-  plot->SetInputData(inputTable.GetPointer());
-  plot->SetInputDensityData(inputDensityTable.GetPointer(), "Density", "Variable");  
-  plot->SetColor(255, 0, 0, 255);
-    
-  // Render the scene  
+  // Render the scene
   view->GetInteractor()->Initialize();
   view->GetInteractor()->Start();
 
