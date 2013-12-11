@@ -99,6 +99,32 @@ int vtkExtractFunctionalBagPlot::RequestData(vtkInformation* /*request*/,
     return false;
     }
 
+  vtkIdType nbPoints = varName->GetNumberOfValues();
+  // Sort the density array
+  std::vector<vtkIdType> ids;
+  ids.resize(nbPoints);
+  double sum = 0.0;
+  for (vtkIdType i = 0; i < nbPoints; i++)
+    {
+    sum += density->GetTuple1(i);
+    ids[i] = i;
+    }
+
+  vtkDoubleArray* nDensity = 0;
+  // Normalize the density array if needed
+  if (fabs(sum - 1.0) > 1.0e-12)
+    {
+    sum = 1.0 / sum;
+    nDensity = vtkDoubleArray::New();
+    nDensity->SetNumberOfComponents(1);
+    nDensity->SetNumberOfTuples(nbPoints);
+    for (vtkIdType i = 0; i < nbPoints; i++)
+      {
+      nDensity->SetTuple1(i, density->GetTuple1(ids[i]) * sum);
+      }
+    density = nDensity;
+    }
+
   // Fetch and sort arrays according their density
   std::vector<DensityVal> varNames;
   for (int i = 0; i < varName->GetNumberOfValues(); i++)
@@ -112,18 +138,21 @@ int vtkExtractFunctionalBagPlot::RequestData(vtkInformation* /*request*/,
 
   std::vector<vtkAbstractArray*> medianLines;
   std::vector<vtkAbstractArray*> q3Lines;
-  double sum = 0.0;
-  for (size_t i = 0; i < varNames.size(); i++)
+  sum = 0.0;
+
+
+  for (vtkIdType i = 0; i < varNames.size(); i++)
     {
-    sum += varNames[i].Density;
-    if (sum <= 0.75)
+    if (i <= (double)nbPoints * 0.5)
       {
-      if (sum <= 0.5)
-        {
-        medianLines.push_back(varNames[i].Array);
-        }
+      medianLines.push_back(varNames[i].Array);
+      }
+    if (i <= (double)nbPoints * 0.75)
+      {
       q3Lines.push_back(varNames[i].Array);
       }
+    else 
+      break;
     }
 
   // Generate the quad strip arrays
@@ -135,7 +164,7 @@ int vtkExtractFunctionalBagPlot::RequestData(vtkInformation* /*request*/,
   q3Points->SetNumberOfTuples(nbRows);
 
   vtkNew<vtkDoubleArray> q2Points;
-  q2Points->SetName("Q2Points");
+  q2Points->SetName("QMedPoints");
   q2Points->SetNumberOfComponents(2);
   q2Points->SetNumberOfTuples(nbRows);
 

@@ -66,7 +66,7 @@ public:
   // Get Smooth H matrix parameter of the HDR.
   vtkGetVectorMacro(SmoothHC1, double, 2);
   vtkSetVectorMacro(SmoothHC1, double, 2);
-  vtkGetVectorMacro(SmoothHC2, double, 2);  
+  vtkGetVectorMacro(SmoothHC2, double, 2);
   vtkSetVectorMacro(SmoothHC2, double, 2);
 
 protected:

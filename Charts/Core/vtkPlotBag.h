@@ -18,22 +18,20 @@
 // .SECTION Description
 // This class allows to draw a bagplot given three columns from
 // a vtkTable. The first two columns will represent X,Y as it is for
-// vtkPlotPoints. The third one will have to specify if the point belongs
-// to a bag polygon, if so the forth colum specifiy the point order in
-// the line.
+// vtkPlotPoints. The third one will have to specify if the density
+// assigned to each point (generally obtained by the
+// vtkHighestDensityRegionsStatistics filter).
+// Points are drawn in a plot points fashion and 2 convex hull polygons
+// are drawn around the median and the 3 quartile of the density field.
+//
+// .SECTION See Also
+// vtkHighestDensityRegionsStatistics
 
 #ifndef __vtkPlotBag_h
 #define __vtkPlotBag_h
 
 #include "vtkChartsCoreModule.h" // For export macro
 #include "vtkPlotPoints.h"
-
-class vtkContext2D;
-class vtkDataArray;
-class vtkIdTypeArray;
-class vtkPoints2D;
-class vtkStdString;
-class vtkTable;
 
 class VTKCHARTSCORE_EXPORT vtkPlotBag : public vtkPlotPoints
 {
@@ -42,7 +40,7 @@ public:
   virtual void PrintSelf(ostream &os, vtkIndent indent);
 
   // Description:
-  // Creates a 2D Chart object.
+  // Creates a new Bag Plot object.
   static vtkPlotBag *New();
 
   // Description:
@@ -100,10 +98,6 @@ protected:
 
   vtkPoints2D* MedianPoints;
   vtkPoints2D* Q3Points;
-
-  // Description:
-  // The point cache is marked dirty until it has been initialized.
-  //vtkTimeStamp BuildTime;
 
 private:
   vtkPlotBag(const vtkPlotBag &); // Not implemented.

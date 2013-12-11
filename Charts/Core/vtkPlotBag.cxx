@@ -13,28 +13,22 @@
 
 =========================================================================*/
 
-#include "vtkPlotBag.h"
-
-#include "vtkAnnotationLink.h"
 #include "vtkBrush.h"
-#include "vtkChartXY.h"
 #include "vtkContext2D.h"
 #include "vtkContextMapper2D.h"
 #include "vtkDataArray.h"
 #include "vtkDoubleArray.h"
-#include "vtkIdTypeArray.h"
 #include "vtkObjectFactory.h"
 #include "vtkPen.h"
+#include "vtkPlotBag.h"
 #include "vtkPoints.h"
 #include "vtkPoints2D.h"
 #include "vtkPointsProjectedHull.h"
-#include "vtkSelection.h"
 #include "vtkStringArray.h"
 #include "vtkTable.h"
 #include "vtkTimeStamp.h"
 
 #include <algorithm>
-#include <sstream>
 
 //-----------------------------------------------------------------------------
 vtkStandardNewMacro(vtkPlotBag);
@@ -126,19 +120,18 @@ void vtkPlotBag::UpdateTableCache(vtkDataArray* density)
     ids[i] = i;
     }
 
-  vtkDoubleArray* nDensity = 0;
+  vtkNew<vtkDoubleArray> nDensity;
   // Normalize the density array if needed
   if (fabs(sum - 1.0) > 1.0e-12)
     {
     sum = 1.0 / sum;
-    nDensity = vtkDoubleArray::New();
     nDensity->SetNumberOfComponents(1);
     nDensity->SetNumberOfTuples(nbPoints);
     for (vtkIdType i = 0; i < nbPoints; i++)
       {
       nDensity->SetTuple1(i, density->GetTuple1(ids[i]) * sum);
       }
-    density = nDensity;
+    density = nDensity.GetPointer();
     }
 
   // Sort array by density
@@ -150,53 +143,71 @@ void vtkPlotBag::UpdateTableCache(vtkDataArray* density)
   vtkNew<vtkPointsProjectedHull> medianPoints;
   medianPoints->Allocate(nbPoints);
 
-  sum = 0.0;
   for (vtkIdType i = 0; i < nbPoints; i++)
     {
-    sum += density->GetTuple1(ids[i]);
-    if (sum > 0.75)
-      {
-      break;
-      }
+    sum += density->GetTuple1(ids[i]);    
     double x[3];
     this->Points->GetPoint(ids[i], x);
-    if (sum <= 0.5)
+    if (i <= (double)nbPoints * 0.5)
       {
       medianPoints->InsertNextPoint(x);
       }
-    q3Points->InsertNextPoint(x);
+    if (i <= (double)nbPoints * 0.75)
+      {
+      q3Points->InsertNextPoint(x);
+      }
+    else 
+      break;
     }
 
   // Compute the convex hull for the median points
-  if (medianPoints->GetNumberOfPoints() > 0)
+  vtkIdType nbMedPoints = medianPoints->GetNumberOfPoints();
+  if (nbMedPoints > 2)
     {
     int size = medianPoints->GetSizeCCWHullZ();
     this->MedianPoints->SetDataTypeToFloat();
     this->MedianPoints->SetNumberOfPoints(size+1);
     medianPoints->GetCCWHullZ(
-      (float*)this->MedianPoints->GetData()->GetVoidPointer(0), size);
+      static_cast<float*>(this->MedianPoints->GetData()->GetVoidPointer(0)), size);
     double x[3];
     this->MedianPoints->GetPoint(0, x);
     this->MedianPoints->SetPoint(size, x);
     }
+  else if (nbMedPoints > 2)
+    {
+    this->MedianPoints->SetNumberOfPoints(nbMedPoints);
+    for (int j = 0; j < nbMedPoints; j++)
+      {
+      double x[3];
+      medianPoints->GetPoint(j, x);
+      this->MedianPoints->SetPoint(j, x);
+      }
+    }
 
   // Compute the convex hull for the first quartile points
-  if (q3Points->GetNumberOfPoints() > 0)
+  vtkIdType nbQ3Points = q3Points->GetNumberOfPoints();
+  if (nbQ3Points > 2)
     {
     int size = q3Points->GetSizeCCWHullZ();
     this->Q3Points->SetDataTypeToFloat();
     this->Q3Points->SetNumberOfPoints(size+1);
     q3Points->GetCCWHullZ(
-      (float*)this->Q3Points->GetData()->GetVoidPointer(0), size);
+      static_cast<float*>(this->Q3Points->GetData()->GetVoidPointer(0)), size);
     double x[3];
     this->Q3Points->GetPoint(0, x);
     this->Q3Points->SetPoint(size, x);
     }
-
-  if (nDensity)
+  else if (nbQ3Points > 0)
     {
-    nDensity->Delete();
+    this->Q3Points->SetNumberOfPoints(nbQ3Points);
+    for (int j = 0; j < nbQ3Points; j++)
+      {
+      double x[3];
+      q3Points->GetPoint(j, x);
+      this->Q3Points->SetPoint(j, x);
+      }
     }
+
   this->BuildTime.Modified();
 }
 
@@ -223,9 +234,13 @@ bool vtkPlotBag::Paint(vtkContext2D *painter)
   this->Brush->SetColor(pcolor[0] / 2, pcolor[1] / 2, pcolor[2] / 2);
   painter->ApplyPen(this->Pen);
   painter->ApplyBrush(this->Brush);
-  if (this->Q3Points->GetNumberOfPoints() > 0)
+  if (this->Q3Points->GetNumberOfPoints() > 2)
     {
     painter->DrawPolygon(this->Q3Points);
+    }
+  else if (this->Q3Points->GetNumberOfPoints() == 2)
+    {
+    painter->DrawLine(this->Q3Points);
     }
 
   this->Brush->SetColor(pcolor);
@@ -233,23 +248,18 @@ bool vtkPlotBag::Paint(vtkContext2D *painter)
   painter->ApplyPen(this->Pen);
   painter->ApplyBrush(this->Brush);
 
-  if (this->MedianPoints->GetNumberOfPoints() > 0)
+  if (this->MedianPoints->GetNumberOfPoints() > 2)
     {
     painter->DrawPolygon(this->MedianPoints);
+    }
+  else if (this->MedianPoints->GetNumberOfPoints() == 2)
+    {
+    painter->DrawLine(this->MedianPoints);
     }
 
   this->Brush->SetColor(bcolor);
   this->Pen->SetColor(pcolor);
 
-
-  //vtkChartXY *parent = vtkChartXY::SafeDownCast(this->Parent);
-  vtkIdTypeArray* sel = this->Selection;
-  if (sel)
-    {
-    std::stringstream ss;
-    sel->PrintSelf(ss,vtkIndent());
-    vtkErrorMacro(<< ss.str());
-    }
   // Let PlotPoints draw the points as usual
   return this->Superclass::Paint(painter);
 }
@@ -257,10 +267,6 @@ bool vtkPlotBag::Paint(vtkContext2D *painter)
 //-----------------------------------------------------------------------------
 bool vtkPlotBag::PaintLegend(vtkContext2D *painter, const vtkRectf& rect, int)
 {
-  //painter->ApplyPen(this->Pen);
-  //painter->DrawLine(
-  //  rect[0], rect[1] + 0.5 * rect[3],
-  //  rect[0] + rect[2], rect[1] + 0.5 * rect[3]);
   vtkNew<vtkPen> blackPen;
   blackPen->SetWidth(1.0);
   blackPen->SetColor(0, 0, 0, 255);
@@ -279,7 +285,7 @@ bool vtkPlotBag::PaintLegend(vtkContext2D *painter, const vtkRectf& rect, int)
   painter->ApplyBrush(this->Brush);
   painter->DrawRect(rect[0] + rect[2] / 2.f, rect[1], rect[2]/2, rect[3]);
 
-  return true;//this->Superclass::PaintLegend(painter, rect, 0);
+  return true;
 }
 
 //-----------------------------------------------------------------------------
@@ -298,7 +304,7 @@ vtkStringArray* vtkPlotBag::GetLabels()
     {
     this->AutoLabels = vtkSmartPointer<vtkStringArray>::New();
     vtkDataArray *density = vtkDataArray::SafeDownCast(
-    this->Data->GetInputAbstractArrayToProcess(2, this->GetInput()));
+      this->Data->GetInputAbstractArrayToProcess(2, this->GetInput()));
     this->AutoLabels->InsertNextValue(density->GetName());
     return this->AutoLabels;
     }
@@ -307,8 +313,8 @@ vtkStringArray* vtkPlotBag::GetLabels()
 
 //-----------------------------------------------------------------------------
 vtkStdString vtkPlotBag::GetTooltipLabel(const vtkVector2d &plotPos,
-                                      vtkIdType seriesIndex,
-                                      vtkIdType)
+                                         vtkIdType seriesIndex,
+                                         vtkIdType)
 {
   vtkStdString tooltipLabel;
   vtkStdString &format = this->TooltipLabelFormat.empty() ?
@@ -330,7 +336,8 @@ vtkStdString vtkPlotBag::GetTooltipLabel(const vtkVector2d &plotPos,
           tooltipLabel += this->GetNumber(plotPos.GetY(), this->YAxis);
           break;
         case 'z':
-          tooltipLabel += density ? density->GetVariantValue(seriesIndex).ToString() : "?";
+          tooltipLabel += density ?
+            density->GetVariantValue(seriesIndex).ToString() : "?";
           break;
         case 'i':
           if (this->IndexedLabels &&
