@@ -27,6 +27,7 @@ vtk_add_test_cxx(
   TestContextUnicode.cxx
   TestControlPointsHandleItem.cxx,-E30
   TestDiagram.cxx
+  TestFunctionalBagPlot.cxx
   TestHistogram2D.cxx
   TestInteractiveChartXYZ.cxx
   TestLegendHiddenPlots.cxx
