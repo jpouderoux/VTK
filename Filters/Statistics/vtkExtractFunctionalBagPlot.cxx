@@ -137,18 +137,19 @@ int vtkExtractFunctionalBagPlot::RequestData(vtkInformation* /*request*/,
 
   std::vector<vtkAbstractArray*> medianLines;
   std::vector<vtkAbstractArray*> q3Lines;
-  sum = 0.0;
-  for (size_t i = 0; i < varNames.size(); i++)
+
+  for (vtkIdType i = 0; i < varNames.size(); i++)
     {
-    sum += varNames[i].Density;
-    if (sum <= 0.75)
+    if (i <= (double)nbPoints * 0.5)
       {
-      if (sum <= 0.5)
-        {
-        medianLines.push_back(varNames[i].Array);
-        }
+      medianLines.push_back(varNames[i].Array);
+      }
+    if (i <= (double)nbPoints * 0.75)
+      {
       q3Lines.push_back(varNames[i].Array);
       }
+    else
+      break;
     }
 
   // Generate the quad strip arrays

@@ -143,21 +143,20 @@ void vtkPlotBag::UpdateTableCache(vtkDataArray* density)
   vtkNew<vtkPointsProjectedHull> medianPoints;
   medianPoints->Allocate(nbPoints);
 
-  sum = 0.0;
   for (vtkIdType i = 0; i < nbPoints; i++)
     {
-    sum += density->GetTuple1(ids[i]);
-    if (sum > 0.75)
-      {
-      break;
-      }
     double x[3];
     this->Points->GetPoint(ids[i], x);
-    if (sum <= 0.5)
+    if (i <= (double)nbPoints * 0.5)
       {
       medianPoints->InsertNextPoint(x);
       }
-    q3Points->InsertNextPoint(x);
+    if (i <= (double)nbPoints * 0.75)
+      {
+      q3Points->InsertNextPoint(x);
+      }
+    else
+      break;
     }
 
   // Compute the convex hull for the median points
