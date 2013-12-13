@@ -3,6 +3,7 @@ set(Module_SRCS
   vtkAxisExtended.cxx
   vtkCategoryLegend.cxx
   vtkChart.cxx
+  vtkChartBox.cxx
   vtkChartHistogram2D.cxx
   vtkChartLegend.cxx
   vtkChartMatrix.cxx
@@ -24,6 +25,7 @@ set(Module_SRCS
   vtkPlot.cxx
   vtkPlot3D.cxx
   vtkPlotBar.cxx
+  vtkPlotBox.cxx
   vtkPlotGrid.cxx
   vtkPlotHistogram2D.cxx
   vtkPlotLine.cxx
