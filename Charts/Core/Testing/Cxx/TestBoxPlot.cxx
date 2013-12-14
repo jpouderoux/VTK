@@ -16,7 +16,7 @@
 #include "vtkRenderer.h"
 #include "vtkRenderWindow.h"
 #include "vtkChartBox.h"
-#include "vtkPlot.h"
+#include "vtkPlotBox.h"
 #include "vtkTable.h"
 #include "vtkLookupTable.h"
 #include "vtkIntArray.h"
@@ -73,10 +73,13 @@ int TestBoxPlot(int , char* [])
 
   chart->GetPlot(0)->SetInputData(inputBoxPlotTable.GetPointer());
   chart->SetColumnVisibilityAll(true);
+  double rgb[3] = { 1., 1., 0. };
+  vtkPlotBox::SafeDownCast(chart->GetPlot(0))->SetColumnColor("Param 1", rgb);
 
   // Render the scene
   view->GetRenderWindow()->SetMultiSamples(0);
   view->GetInteractor()->Initialize();
+  view->Render();
   view->GetInteractor()->Start();
 
   return EXIT_SUCCESS;

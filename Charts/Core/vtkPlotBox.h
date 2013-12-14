@@ -88,6 +88,8 @@ public:
   void SetLookupTable(vtkScalarsToColors *lut);
   vtkScalarsToColors *GetLookupTable();
 
+  void SetColumnColor(const vtkStdString& colName, double *rgb);
+
   // Description:
   // Create default lookup table. Generally used to create one when none
   // is available with the scalar data.

@@ -33,6 +33,8 @@
 #include "vtkLookupTable.h"
 #include "vtkUnsignedCharArray.h"
 #include "vtkStringArray.h"
+#include "vtkDataSetAttributes.h"
+#include "vtkAbstractArray.h"
 
 // Need to turn some arrays of strings into categories
 #include "vtkStringToCategory.h"
@@ -122,8 +124,11 @@ bool vtkPlotBox::Paint(vtkContext2D *painter)
 
   for (int i = 0; i < cols; i++)
     {
-    double rgb[3];
-    this->LookupTable->GetColor(i, rgb);
+    vtkStdString colName = parent->GetVisibleColumns()->GetValue(i);
+    int index;
+    this->GetInput()->GetRowData()->GetAbstractArray(colName.c_str(), index);
+    double rgb[4];
+    this->LookupTable->GetIndexedColor(index, rgb);
     vtkNew<vtkBrush> brush;
     brush->SetColor(rgb[0] * 255., rgb[1] * 255, rgb[2] * 255, 255);
     vtkNew<vtkPen> blackPen;
@@ -247,8 +252,7 @@ vtkIdType vtkPlotBox::GetNearestPoint(const vtkVector2f& point,
 {
   size_t cols = this->Storage->size();
 
-  vtkChartBox *parent =
-    vtkChartBox::SafeDownCast(this->Parent);
+  vtkChartBox *parent = vtkChartBox::SafeDownCast(this->Parent);
 
   for (int i = 0; i < cols; i++)
     {
@@ -276,9 +280,10 @@ vtkIdType vtkPlotBox::GetNearestPoint(const vtkVector2f& point,
 //-----------------------------------------------------------------------------
 bool vtkPlotBox::UpdateTableCache(vtkTable *table)
 {
-  // Each axis is a column in our storage array, they are scaled from 0.0 to 1.0
-  vtkChartBox *parent =
-      vtkChartBox::SafeDownCast(this->Parent);
+  // Each boxplot is a column in our storage array,
+  // they are scaled from 0.0 to 1.0
+  vtkChartBox *parent = vtkChartBox::SafeDownCast(this->Parent);
+
   if (!parent || !table || table->GetNumberOfColumns() == 0)
     {
     return false;
@@ -319,9 +324,9 @@ bool vtkPlotBox::UpdateTableCache(vtkTable *table)
 //-----------------------------------------------------------------------------
 void vtkPlotBox::SetLookupTable(vtkScalarsToColors *lut)
 {
-  if ( this->LookupTable != lut )
+  if (this->LookupTable != lut)
     {
-    if ( this->LookupTable)
+    if (this->LookupTable)
       {
       this->LookupTable->UnRegister(this);
       }
@@ -337,7 +342,7 @@ void vtkPlotBox::SetLookupTable(vtkScalarsToColors *lut)
 //-----------------------------------------------------------------------------
 vtkScalarsToColors *vtkPlotBox::GetLookupTable()
 {
-  if ( this->LookupTable == 0 )
+  if (this->LookupTable == 0)
     {
     this->CreateDefaultLookupTable();
     }
@@ -345,18 +350,36 @@ vtkScalarsToColors *vtkPlotBox::GetLookupTable()
 }
 
 //-----------------------------------------------------------------------------
+void vtkPlotBox::SetColumnColor(const vtkStdString& colName, double *rgb)
+{
+  if (this->LookupTable == 0)
+    {
+    this->CreateDefaultLookupTable();
+    }
+  int index;
+  this->GetInput()->GetRowData()->GetAbstractArray(colName.c_str(), index);
+  vtkLookupTable* lut = vtkLookupTable::SafeDownCast(this->LookupTable);
+  if (index >= 0 && lut)
+    {
+    lut->SetTableValue(index, rgb[0], rgb[1], rgb[2]);
+    lut->Build();
+    }
+}
+
+//-----------------------------------------------------------------------------
 void vtkPlotBox::CreateDefaultLookupTable()
 {
-  if ( this->LookupTable)
+  if (this->LookupTable)
     {
     this->LookupTable->UnRegister(this);
     }
-  this->LookupTable = vtkLookupTable::New();
+  vtkLookupTable* lut = vtkLookupTable::New();
+  this->LookupTable = lut;
   // Consistent Register/UnRegisters.
   this->LookupTable->Register(this);
   this->LookupTable->Delete();
   vtkTable *table = this->GetInput();
-  this->LookupTable->SetRange(0, table->GetNumberOfColumns());
+  lut->SetNumberOfColors(table->GetNumberOfColumns());
   this->LookupTable->Build();
 }
 
