@@ -28,6 +28,7 @@ class vtkIdTypeArray;
 class vtkStdString;
 class vtkStringArray;
 class vtkPlotBox;
+class vtkTooltipItem;
 
 class VTKCHARTSCORE_EXPORT vtkChartBox : public vtkChart
 {
@@ -122,6 +123,20 @@ public:
   virtual bool MouseWheelEvent(const vtkContextMouseEvent &mouse, int delta);
 //ETX
 
+  // Description:
+  // Set the vtkTooltipItem object that will be displayed by the chart.
+  virtual void SetTooltip(vtkTooltipItem *tooltip);
+
+  // Description:
+  // Get the vtkTooltipItem object that will be displayed by the chart.
+  virtual vtkTooltipItem* GetTooltip();
+
+  // Description:
+  // Set the information passed to the tooltip.
+  virtual void SetTooltipInfo(const vtkContextMouseEvent &,
+                              const vtkVector2d &,
+                              vtkIdType, vtkPlot*,
+                              vtkIdType segmentIndex = -1);
 //BTX
 protected:
   vtkChartBox();
@@ -146,10 +161,25 @@ protected:
   // The point cache is marked dirty until it has been initialized.
   vtkTimeStamp BuildTime;
 
+  // Description:
+  // The tooltip item for the chart - can be used to display extra information.
+  vtkSmartPointer<vtkTooltipItem> Tooltip;
+
   void ResetSelection();
   void UpdateGeometry();
   void CalculatePlotTransform();
   void SwapAxes(int a1, int a2);
+
+  // Description:
+  // Try to locate a point within the plots to display in a tooltip.
+  // If invokeEvent is greater than 0, then an event will be invoked if a point
+  // is at that mouse position.
+  bool LocatePointInPlots(const vtkContextMouseEvent &mouse,
+                          int invokeEvent = -1);
+
+  int LocatePointInPlot(const vtkVector2f &position,
+                        const vtkVector2f &tolerance, vtkVector2f &plotPos,
+                        vtkPlot *plot, vtkIdType &segmentIndex);
 
 private:
   vtkChartBox(const vtkChartBox &); // Not implemented.

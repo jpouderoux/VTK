@@ -67,6 +67,7 @@ vtkPlotBox::vtkPlotBox()
   this->LookupTable = 0;
   this->Colors = 0;
   this->ScalarVisibility = 0;
+  this->TooltipDefaultLabelFormat = "%y";
 }
 
 //-----------------------------------------------------------------------------
@@ -318,8 +319,8 @@ bool vtkPlotBox::ResetSelectionRange()
 //-----------------------------------------------------------------------------
 void vtkPlotBox::SetInputData(vtkTable* table)
 {
-  if (table == this->Data->GetInput() && (!table ||
-                                          table->GetMTime() < this->BuildTime))
+  if (table == this->Data->GetInput() &&
+    (!table || table->GetMTime() < this->BuildTime))
     {
     return;
     }
@@ -344,7 +345,57 @@ void vtkPlotBox::SetInputData(vtkTable* table)
     parent->GetVisibleColumns()->SetNumberOfTuples(0);
     }
 }
+namespace
+{
+// See if the point is within tolerance.
+bool inRange(const vtkVector2f& point, const vtkVector2f& tol,
+             const vtkVector2f& current)
+{
+  if (current.GetX() > point.GetX() - tol.GetX() && current.GetX() < point.GetX() + tol.GetX() &&
+      current.GetY() > point.GetY() - tol.GetY() && current.GetY() < point.GetY() + tol.GetY())
+    {
+    return true;
+    }
+  else
+    {
+    return false;
+    }
+}
+}
 
+//-----------------------------------------------------------------------------
+vtkIdType vtkPlotBox::GetNearestPoint(const vtkVector2f& point,
+                                      const vtkVector2f& tol,
+                                      vtkVector2f* location)
+{
+  size_t cols = this->Storage->size();
+
+  vtkChartBox *parent =
+    vtkChartBox::SafeDownCast(this->Parent);
+
+  for (int i = 0; i < cols; i++)
+    {
+    vtkVector2f v;
+    v.SetX(parent->GetAxis(int(i))->GetPoint1()[0]);
+    for (int j = 0; j < 5; j++)
+      {
+      v.SetY((*this->Storage)[i][j]);
+      if (inRange(point, tol, v))
+        {
+        vtkAxis* axis = parent->GetAxis(i);
+        double min = axis->GetUnscaledMinimum();
+        double max = axis->GetUnscaledMaximum();
+        double scale = 1.0f / (max - min);
+        double y = (*this->Storage)[i][j] / scale + min;
+        location->SetX(i);
+        location->SetY(y);
+        return static_cast<int>(i);
+        }
+      }
+    }
+  return -1;
+
+}
 //-----------------------------------------------------------------------------
 bool vtkPlotBox::UpdateTableCache(vtkTable *table)
 {

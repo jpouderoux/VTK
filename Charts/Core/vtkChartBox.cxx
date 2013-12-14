@@ -37,6 +37,7 @@
 #include "vtkStringArray.h"
 #include "vtkNew.h"
 #include "vtkPlotGrid.h"
+#include "vtkTooltipItem.h"
 
 #include <vector>
 #include <algorithm>
@@ -81,6 +82,10 @@ vtkChartBox::vtkChartBox()
   this->Selection = vtkIdTypeArray::New();
   this->Storage->Plot->SetSelection(this->Selection);
   this->VisibleColumns = vtkStringArray::New();
+
+  this->Tooltip = vtkSmartPointer<vtkTooltipItem>::New();
+  this->Tooltip->SetVisible(false);
+  this->AddItem(this->Tooltip);
 
   // Set up default mouse button assignments for parallel coordinates.
   this->SetActionToButton(vtkChart::PAN, vtkContextMouseEvent::RIGHT_BUTTON);
@@ -217,6 +222,11 @@ bool vtkChartBox::Paint(vtkContext2D *painter)
        it != this->Storage->Axes.end(); ++it)
     {
     (*it)->Paint(painter);
+    }
+
+  if (this->Tooltip->GetVisible())
+    {
+    this->Tooltip->Paint(painter);
     }
 
   return true;
@@ -532,6 +542,15 @@ bool vtkChartBox::MouseMoveEvent(const vtkContextMouseEvent &mouse)
     this->Scene->SetDirty(true);
     }
 */
+  if (mouse.GetButton() == vtkContextMouseEvent::NO_BUTTON)
+    {
+    this->Scene->SetDirty(true);
+
+    if(this->Tooltip)
+      {
+      this->Tooltip->SetVisible(this->LocatePointInPlots(mouse));
+      }
+    }
   return true;
 }
 
@@ -617,8 +636,73 @@ bool vtkChartBox::MouseButtonPressEvent(
     {
     return false;
     }*/
+
   return true;
 }
+
+
+//-----------------------------------------------------------------------------
+int vtkChartBox::LocatePointInPlot(const vtkVector2f &position,
+                                  const vtkVector2f &tolerance,
+                                  vtkVector2f &plotPos,
+                                  vtkPlot *plot,
+                                  vtkIdType &segmentIndex)
+{
+  if (plot && plot->GetVisible())
+    {
+    vtkPlotBox* plotBar = vtkPlotBox::SafeDownCast(plot);
+    if (plotBar)
+      {
+      // If the plot is a vtkPlotBar, get the segment index too
+      return plotBar->GetNearestPoint(position, tolerance,
+                                      &plotPos);
+      }
+    else
+      {
+      return plot->GetNearestPoint(position, tolerance, &plotPos);
+      }
+    }
+  return -1;
+}
+
+//-----------------------------------------------------------------------------
+bool vtkChartBox::LocatePointInPlots(const vtkContextMouseEvent &mouse,
+                                     int invokeEvent)
+{
+  vtkVector2i pos(mouse.GetScreenPos());
+  if (pos[0] > this->Point1[0] &&
+      pos[0] < this->Point2[0] &&
+      pos[1] > this->Point1[1] &&
+      pos[1] < this->Point2[1])
+    {
+    vtkVector2f plotPos, position;
+    vtkTransform2D* transform =
+      this->Storage->Transform.GetPointer();
+    transform->InverseTransformPoints(mouse.GetPos().GetData(),
+      position.GetData(), 1);
+    // Use a tolerance of +/- 5 pixels
+    vtkVector2f tolerance(5*(1.0/transform->GetMatrix()->GetElement(0, 0)),
+      5*(1.0/transform->GetMatrix()->GetElement(1, 1)));
+
+    vtkPlot* plot = this->Storage->Plot.GetPointer();
+    vtkIdType segmentIndex;
+    int seriesIndex =
+      LocatePointInPlot(position, tolerance, plotPos, plot, segmentIndex);
+
+    if (seriesIndex >= 0)
+      {
+      // We found a point, set up the tooltip and return
+      vtkRectd ss(plot->GetShiftScale());
+      vtkVector2d plotPosd(plotPos[0] / ss[2] - ss[0],
+        plotPos[1] / ss[3] - ss[1]);
+      this->SetTooltipInfo(mouse, plotPosd, seriesIndex, plot,
+        segmentIndex);
+      return true;
+      }
+    }
+  return false;
+}
+
 
 //-----------------------------------------------------------------------------
 bool vtkChartBox::MouseButtonReleaseEvent(
@@ -728,6 +812,57 @@ void vtkChartBox::ResetSelection()
         }
       }
     }*/
+}
+
+//-----------------------------------------------------------------------------
+void vtkChartBox::SetTooltip(vtkTooltipItem *tooltip)
+{
+  if(tooltip == this->Tooltip)
+    {
+    // nothing to change
+    return;
+    }
+
+  if(this->Tooltip)
+    {
+    // remove current tooltip from scene
+    this->RemoveItem(this->Tooltip);
+    }
+
+  this->Tooltip = tooltip;
+
+  if(this->Tooltip)
+    {
+    // add new tooltip to scene
+    this->AddItem(this->Tooltip);
+    }
+}
+
+//-----------------------------------------------------------------------------
+vtkTooltipItem* vtkChartBox::GetTooltip()
+{
+  return this->Tooltip;
+}
+
+//-----------------------------------------------------------------------------
+void vtkChartBox::SetTooltipInfo(const vtkContextMouseEvent& mouse,
+                                const vtkVector2d &plotPos,
+                                vtkIdType seriesIndex, vtkPlot* plot,
+                                vtkIdType segmentIndex)
+{
+  if (!this->Tooltip)
+    {
+    return;
+    }
+
+  // Have the plot generate its tooltip label
+  vtkStdString tooltipLabel = plot->GetTooltipLabel(plotPos, seriesIndex,
+                                                    segmentIndex);
+
+  // Set the tooltip
+  this->Tooltip->SetText(tooltipLabel);
+  this->Tooltip->SetPosition(mouse.GetScreenPos()[0] + 2,
+                             mouse.GetScreenPos()[1] + 2);
 }
 
 //-----------------------------------------------------------------------------

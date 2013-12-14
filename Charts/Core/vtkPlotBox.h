@@ -84,6 +84,14 @@ public:
   }
 
   // Description:
+  // Function to query a plot for the nearest point to the specified coordinate.
+  // Returns the index of the data series with which the point is associated or
+  // -1.
+  virtual vtkIdType GetNearestPoint(const vtkVector2f& point,
+                                    const vtkVector2f& tolerance,
+                                    vtkVector2f* location);
+
+  // Description:
   // Specify a lookup table for the mapper to use.
   void SetLookupTable(vtkScalarsToColors *lut);
   vtkScalarsToColors *GetLookupTable();
