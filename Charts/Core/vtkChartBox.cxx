@@ -80,6 +80,7 @@ vtkChartBox::vtkChartBox()
   this->Storage->Plot->SetParent(this);
   this->GeometryValid = false;
   this->Selection = vtkIdTypeArray::New();
+  this->SelectedColumn = -1;
   this->Storage->Plot->SetSelection(this->Selection);
   this->VisibleColumns = vtkStringArray::New();
 
@@ -194,7 +195,7 @@ bool vtkChartBox::Paint(vtkContext2D *painter)
 
   // Handle selections
   vtkIdTypeArray *idArray = 0;
-  /*if (this->AnnotationLink)
+  if (this->AnnotationLink)
     {
     vtkSelection *selection = this->AnnotationLink->GetCurrentSelection();
     if (selection->GetNumberOfNodes() &&
@@ -208,7 +209,7 @@ bool vtkChartBox::Paint(vtkContext2D *painter)
   else
     {
     vtkDebugMacro("No annotation link set.");
-    }*/
+    }
 
   painter->PushMatrix();
   painter->SetTransform(this->Storage->Transform.GetPointer());
@@ -224,7 +225,7 @@ bool vtkChartBox::Paint(vtkContext2D *painter)
     (*it)->Paint(painter);
     }
 
-  if (this->Tooltip->GetVisible())
+  if (this->Tooltip && this->Tooltip->GetVisible())
     {
     this->Tooltip->Paint(painter);
     }
@@ -266,6 +267,10 @@ void vtkChartBox::SetColumnVisibility(const vtkStdString& name,
           }
         this->VisibleColumns->SetNumberOfTuples(
             this->VisibleColumns->GetNumberOfTuples()-1);
+        if (this->SelectedColumn >= this->VisibleColumns->GetNumberOfTuples())
+          {
+          this->SelectedColumn = -1;
+          }
         this->Modified();
         this->Update();
         return;
@@ -279,6 +284,7 @@ void vtkChartBox::SetColumnVisibilityAll(bool visible)
 {
   // We always need to clear the current visible columns.
   this->VisibleColumns->SetNumberOfTuples(0);
+  this->SelectedColumn = -1;
   if (visible)
     {
     vtkTable *table = this->GetPlot(0)->GetInput();
@@ -383,6 +389,13 @@ void vtkChartBox::UpdateGeometry()
     this->GeometryValid = true;
     // Cause the plot transform to be recalculated if necessary
     this->CalculatePlotTransform();
+
+    if (this->VisibleColumns->GetNumberOfValues() > 1)
+      {
+      this->Storage->Plot->SetBoxWidth((this->GetAxis(1)->GetPoint1()[0] -
+        this->GetAxis(0)->GetPoint1()[0]) / 2.f);
+      }
+
     this->Storage->Plot->Update();
     }
 }
@@ -440,113 +453,49 @@ bool vtkChartBox::MouseEnterEvent(const vtkContextMouseEvent &)
 //-----------------------------------------------------------------------------
 bool vtkChartBox::MouseMoveEvent(const vtkContextMouseEvent &mouse)
 {
-  /*if (mouse.GetButton() == this->Actions.Select())
+  if (mouse.GetButton() == this->Actions.Pan() && this->SelectedColumn >= 0)
     {
-    // If an axis is selected, then lets try to narrow down a selection...
-    if (this->Storage->CurrentAxis >= 0)
+    if (this->Tooltip)
       {
-      vtkVector<float, 2> &range =
-          this->Storage->AxesSelections[this->Storage->CurrentAxis];
+      this->Tooltip->SetVisible(false);
+      }
 
-      // Normalize the coordinates
-      float current = mouse.GetScenePos().GetY();
-      current -= this->Storage->Transform->GetMatrix()->GetElement(1, 2);
-      current /= this->Storage->Transform->GetMatrix()->GetElement(1, 1);
+    vtkAxis* axis = this->Storage->Axes[this->SelectedColumn];
 
-      if (current > 1.0f)
-        {
-        range[1] = 1.0f;
-        }
-      else if (current < 0.0f)
-        {
-        range[1] = 0.0f;
-        }
-      else
-        {
-        range[1] = current;
-        }
+    // Move the axis in x
+    float deltaX = mouse.GetScenePos().GetX() - mouse.GetLastScenePos().GetX();
+
+    axis->SetPoint1(axis->GetPoint1()[0]+deltaX, axis->GetPoint1()[1]);
+    axis->SetPoint2(axis->GetPoint2()[0]+deltaX, axis->GetPoint2()[1]);
+
+    vtkAxis* leftAxis = this->SelectedColumn > 0 ?
+      this->Storage->Axes[this->SelectedColumn-1] :
+    NULL;
+
+    float width = this->Storage->Plot->GetBoxWidth() * 0.5f;
+
+    vtkAxis* rightAxis =
+      this->SelectedColumn < static_cast<int>(this->Storage->Axes.size())-1 ?
+      this->Storage->Axes[this->SelectedColumn+1] : NULL;
+
+    if (leftAxis && (axis->GetPoint1()[0] - width) < leftAxis->GetPoint1()[0])
+      {
+      this->SwapAxes(this->SelectedColumn, this->SelectedColumn - 1);
+      this->SelectedColumn--;
+      }
+    else if (rightAxis && (axis->GetPoint1()[0] + width) > rightAxis->GetPoint1()[0])
+      {
+      this->SwapAxes(this->SelectedColumn, this->SelectedColumn + 1);
+      this->SelectedColumn++;
       }
     this->Scene->SetDirty(true);
     }
-  else if (mouse.GetButton() == this->Actions.Pan())
-    {
-    vtkAxis* axis = this->Storage->Axes[this->Storage->CurrentAxis];
-    if (this->Storage->AxisResize == 0)
-      {
-      // Move the axis in x
-      float deltaX = mouse.GetScenePos().GetX() - mouse.GetLastScenePos().GetX();
 
-      axis->SetPoint1(axis->GetPoint1()[0]+deltaX, axis->GetPoint1()[1]);
-      axis->SetPoint2(axis->GetPoint2()[0]+deltaX, axis->GetPoint2()[1]);
-
-      vtkAxis* leftAxis = this->Storage->CurrentAxis > 0 ?
-        this->Storage->Axes[this->Storage->CurrentAxis-1] :
-        NULL;
-
-      vtkAxis* rightAxis =
-          this->Storage->CurrentAxis < static_cast<int>(this->Storage->Axes.size())-1 ?
-          this->Storage->Axes[this->Storage->CurrentAxis+1] : NULL;
-
-      if (leftAxis && axis->GetPoint1()[0] < leftAxis->GetPoint1()[0])
-        {
-        this->SwapAxes(this->Storage->CurrentAxis,this->Storage->CurrentAxis-1);
-        this->Storage->CurrentAxis--;
-        }
-      else if (rightAxis && axis->GetPoint1()[0] > rightAxis->GetPoint1()[0])
-        {
-        this->SwapAxes(this->Storage->CurrentAxis,this->Storage->CurrentAxis+1);
-        this->Storage->CurrentAxis++;
-        }
-      }
-    else if (this->Storage->AxisResize == 1)
-      {
-      // Modify the bottom axis range...
-      float deltaY = mouse.GetScenePos().GetY() - mouse.GetLastScenePos().GetY();
-      float scale = (axis->GetPoint2()[1]-axis->GetPoint1()[1]) /
-                    (axis->GetMaximum() - axis->GetMinimum());
-      axis->SetMinimum(axis->GetMinimum() - deltaY/scale);
-      // If there is an active selection on the axis, remove it
-      vtkVector<float, 2>& range =
-          this->Storage->AxesSelections[this->Storage->CurrentAxis];
-      if (range[0] != range[1])
-        {
-        range[0] = range[1] = 0.0f;
-        this->ResetSelection();
-        }
-
-      // Now update everything that needs to be
-      axis->Update();
-      axis->RecalculateTickSpacing();
-      this->Storage->Plot->Update();
-      }
-    else if (this->Storage->AxisResize == 2)
-      {
-      // Modify the bottom axis range...
-      float deltaY = mouse.GetScenePos().GetY() - mouse.GetLastScenePos().GetY();
-      float scale = (axis->GetPoint2()[1]-axis->GetPoint1()[1]) /
-                    (axis->GetMaximum() - axis->GetMinimum());
-      axis->SetMaximum(axis->GetMaximum() - deltaY/scale);
-      // If there is an active selection on the axis, remove it
-      vtkVector<float, 2>& range =
-          this->Storage->AxesSelections[this->Storage->CurrentAxis];
-      if (range[0] != range[1])
-        {
-        range[0] = range[1] = 0.0f;
-        this->ResetSelection();
-        }
-
-      axis->Update();
-      axis->RecalculateTickSpacing();
-      this->Storage->Plot->Update();
-      }
-    this->Scene->SetDirty(true);
-    }
-*/
   if (mouse.GetButton() == vtkContextMouseEvent::NO_BUTTON)
     {
     this->Scene->SetDirty(true);
 
-    if(this->Tooltip)
+    if (this->Tooltip)
       {
       this->Tooltip->SetVisible(this->LocatePointInPlots(mouse));
       }
@@ -564,7 +513,7 @@ bool vtkChartBox::MouseLeaveEvent(const vtkContextMouseEvent &)
 bool vtkChartBox::MouseButtonPressEvent(
     const vtkContextMouseEvent& mouse)
 {
-  /*if (mouse.GetButton() == this->Actions.Select())
+  if (mouse.GetButton() == this->Actions.Select())
     {
     // Select an axis if we are within range
     if (mouse.GetScenePos()[1] > this->Point1[1] &&
@@ -574,33 +523,21 @@ bool vtkChartBox::MouseButtonPressEvent(
       for (size_t i = 0; i < this->Storage->Axes.size(); ++i)
         {
         vtkAxis* axis = this->Storage->Axes[i];
-        if (axis->GetPoint1()[0]-10 < mouse.GetScenePos()[0] &&
-            axis->GetPoint1()[0]+10 > mouse.GetScenePos()[0])
+        float width = this->Storage->Plot->GetBoxWidth() / 2.f;
+        if (axis->GetPoint1()[0]-width < mouse.GetScenePos()[0] &&
+            axis->GetPoint1()[0]+width > mouse.GetScenePos()[0])
           {
-          this->Storage->CurrentAxis = static_cast<int>(i);
-          vtkVector<float, 2>& range = this->Storage->AxesSelections[i];
-          if (range[0] != range[1])
-            {
-            range[0] = range[1] = 0.0f;
-            this->ResetSelection();
-            }
-
-          // Transform into normalized coordinates
-          float low = mouse.GetScenePos()[1];
-          low -= this->Storage->Transform->GetMatrix()->GetElement(1, 2);
-          low /= this->Storage->Transform->GetMatrix()->GetElement(1, 1);
-          range[0] = range[1] = low;
-
+          this->SelectedColumn = static_cast<int>(i);
           this->Scene->SetDirty(true);
           return true;
           }
         }
       }
-    this->Storage->CurrentAxis = -1;
+    this->SelectedColumn = -1;
     this->Scene->SetDirty(true);
     return true;
     }
-  else if (mouse.GetButton() == this->Actions.Pan())
+  /*else if (mouse.GetButton() == this->Actions.Pan())
     {
     // Middle mouse button - move and zoom the axes
     // Iterate over the axes, see if we are within 10 pixels of an axis
@@ -646,7 +583,7 @@ int vtkChartBox::LocatePointInPlot(const vtkVector2f &position,
                                   const vtkVector2f &tolerance,
                                   vtkVector2f &plotPos,
                                   vtkPlot *plot,
-                                  vtkIdType &segmentIndex)
+                                  vtkIdType &)
 {
   if (plot && plot->GetVisible())
     {
@@ -697,61 +634,30 @@ bool vtkChartBox::LocatePointInPlots(const vtkContextMouseEvent &mouse,
         plotPos[1] / ss[3] - ss[1]);
       this->SetTooltipInfo(mouse, plotPosd, seriesIndex, plot,
         segmentIndex);
+      if (invokeEvent >= 0)
+        {
+        vtkChartBoxData plotIndex;
+        plotIndex.SeriesName = this->GetVisibleColumns()->GetValue(seriesIndex);
+        plotIndex.Position = plotPos;
+        plotIndex.ScreenPosition = mouse.GetScreenPos();
+        plotIndex.Index = segmentIndex;;
+        // Invoke an event, with the client data supplied
+        this->InvokeEvent(invokeEvent, static_cast<void*>(&plotIndex));
+        }
       return true;
       }
     }
   return false;
 }
 
-
 //-----------------------------------------------------------------------------
 bool vtkChartBox::MouseButtonReleaseEvent(
     const vtkContextMouseEvent& mouse)
 {
-  /*if (mouse.GetButton() == this->Actions.Select())
+  if (mouse.GetButton() == this->Actions.Select())
     {
-    if (this->Storage->CurrentAxis >= 0)
+    if (this->SelectedColumn >= 0)
       {
-      vtkVector<float, 2> &range =
-          this->Storage->AxesSelections[this->Storage->CurrentAxis];
-
-      float final = mouse.GetScenePos()[1];
-      final -= this->Storage->Transform->GetMatrix()->GetElement(1, 2);
-      final /= this->Storage->Transform->GetMatrix()->GetElement(1, 1);
-
-      // Set the final mouse position
-      if (final > 1.0)
-        {
-        range[1] = 1.0;
-        }
-      else if (final < 0.0)
-        {
-        range[1] = 0.0;
-        }
-      else
-        {
-        range[1] = final;
-        }
-
-      if (range[0] == range[1])
-        {
-        this->ResetSelection();
-        }
-      else
-        {
-        // Add a new selection
-        if (range[0] < range[1])
-          {
-          this->Storage->Plot->SetSelectionRange(this->Storage->CurrentAxis,
-                                                 range[0], range[1]);
-          }
-        else
-          {
-          this->Storage->Plot->SetSelectionRange(this->Storage->CurrentAxis,
-                                                 range[1], range[0]);
-          }
-        }
-
       if (this->AnnotationLink)
         {
         vtkSelection* selection = vtkSelection::New();
@@ -772,10 +678,11 @@ bool vtkChartBox::MouseButtonReleaseEvent(
     }
   else if (mouse.GetButton() == this->Actions.Pan())
     {
-    this->Storage->CurrentAxis = -1;
-    this->Storage->AxisResize = -1;
+    this->GeometryValid = false;
+    this->UpdateGeometry();
+    this->SelectedColumn = -1;
     return true;
-    }*/
+    }
   return false;
 }
 
@@ -789,29 +696,6 @@ bool vtkChartBox::MouseWheelEvent(const vtkContextMouseEvent &,
 //-----------------------------------------------------------------------------
 void vtkChartBox::ResetSelection()
 {
-  // This function takes care of resetting the selection of the chart
-  // Reset the axes.
-  /*this->Storage->Plot->ResetSelectionRange();
-
-  // Now set the remaining selections that were kept
-  for (size_t i = 0; i < this->Storage->AxesSelections.size(); ++i)
-    {
-    vtkVector<float, 2> &range = this->Storage->AxesSelections[i];
-    if (range[0] != range[1])
-      {
-      // Process the selected range and display this
-      if (range[0] < range[1])
-        {
-        this->Storage->Plot->SetSelectionRange(static_cast<int>(i),
-                                               range[0], range[1]);
-        }
-      else
-        {
-        this->Storage->Plot->SetSelectionRange(static_cast<int>(i),
-                                               range[1], range[0]);
-        }
-      }
-    }*/
 }
 
 //-----------------------------------------------------------------------------
@@ -875,20 +759,19 @@ void vtkChartBox::PrintSelf(ostream &os, vtkIndent indent)
 void vtkChartBox::SwapAxes(int a1, int a2)
 {
   // only neighboring axes
-  /*if (abs(a1-a2) != 1)
+  if (abs(a1-a2) != 1)
     return;
 
   vtkAxis* axisTmp = this->Storage->Axes[a1];
   this->Storage->Axes[a1] = this->Storage->Axes[a2];
   this->Storage->Axes[a2] = axisTmp;
 
-  vtkVector<float, 2> selTmp = this->Storage->AxesSelections[a1];
-  this->Storage->AxesSelections[a1] = this->Storage->AxesSelections[a2];
-  this->Storage->AxesSelections[a2] = selTmp;
-
   vtkStdString colTmp = this->VisibleColumns->GetValue(a1);
   this->VisibleColumns->SetValue(a1,this->VisibleColumns->GetValue(a2));
   this->VisibleColumns->SetValue(a2,colTmp);
 
-  this->Storage->Plot->Update();*/
+  this->GeometryValid = false;
+  this->UpdateGeometry();
+
+  this->Storage->Plot->Update();
 }

@@ -67,6 +67,10 @@ public:
   // Get a list of the columns, and the order in which they are displayed.
   vtkGetObjectMacro(VisibleColumns, vtkStringArray);
 
+  // Index of the selected column in the visible columns list.
+  vtkGetMacro(SelectedColumn, int);
+  vtkSetMacro(SelectedColumn, int);
+
   // Description:
   // Get the plot at the specified index, returns null if the index is invalid.
   virtual vtkPlot* GetPlot(vtkIdType index);
@@ -158,6 +162,10 @@ protected:
   vtkStringArray *VisibleColumns;
 
   // Description:
+  // Index of the selected column in the visible columns list.
+  int SelectedColumn;
+
+  // Description:
   // The point cache is marked dirty until it has been initialized.
   vtkTimeStamp BuildTime;
 
@@ -185,6 +193,18 @@ private:
   vtkChartBox(const vtkChartBox &); // Not implemented.
   void operator=(const vtkChartBox &);   // Not implemented.
 //ETX
+};
+
+// Description:
+// Small struct used by InvokeEvent to send some information about the point
+// that was clicked on. This is an experimental part of the API, subject to
+// change.
+struct vtkChartBoxData
+{
+  vtkStdString SeriesName;
+  vtkVector2f Position;
+  vtkVector2i ScreenPosition;
+  int Index;
 };
 
 #endif //__vtkChartBox_h

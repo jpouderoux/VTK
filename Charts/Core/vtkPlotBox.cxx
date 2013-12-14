@@ -116,13 +116,12 @@ bool vtkPlotBox::Paint(vtkContext2D *painter)
 
   painter->ApplyPen(this->Pen);
 
-  if (this->Storage->size() == 0)
+  if (this->Storage->size() == 0 || this->Storage->at(0).size() < 5)
     {
     return false;
     }
 
   size_t cols = this->Storage->size();
-  size_t rows = this->Storage->at(0).size();
 
   vtkIdType selection = 0;
   vtkIdType id = 0;
@@ -139,12 +138,6 @@ bool vtkPlotBox::Paint(vtkContext2D *painter)
     // Update the axis positions
   vtkChartBox *parent = vtkChartBox::SafeDownCast(this->Parent);
 
-  if (cols > 1)
-    {
-    this->BoxWidth = (parent->GetAxis(1)->GetPoint1()[0] -
-     parent->GetAxis(0)->GetPoint1()[0]) / 2.;
-    }
-
   for (int i = 0; i < cols; i++)
     {
     vtkNew<vtkBrush> brush;
@@ -153,6 +146,13 @@ bool vtkPlotBox::Paint(vtkContext2D *painter)
     blackPen->SetWidth(this->Pen->GetWidth());
     blackPen->SetColor(0, 0, 0, 128);
     blackPen->SetOpacity(255);
+
+    if (parent->GetSelectedColumn() == i)
+      {
+      unsigned char* col = this->Pen->GetColor();
+      brush->SetColor(col[0]^255,col[1]^255,col[2]^255,255);
+      }
+
     painter->ApplyPen(blackPen.GetPointer());
     painter->ApplyBrush(brush.GetPointer());
 
@@ -263,8 +263,7 @@ void vtkPlotBox::GetBounds(double *)
 }
 
 //-----------------------------------------------------------------------------
-bool vtkPlotBox::SetSelectionRange(int axis, float low,
-                                                   float high)
+bool vtkPlotBox::SetSelectionRange(int axis, float low, float high)
 {
   if (!this->Selection)
     {

@@ -115,6 +115,11 @@ public:
   void SelectColorArray(const vtkStdString &arrayName);
 
   // Description:
+  // Get/Set the width of boxes.
+  vtkGetMacro(BoxWidth, float);
+  vtkSetMacro(BoxWidth, float);
+
+  // Description:
   // Get the array name to color by.
   vtkStdString GetColorArrayName();
 
