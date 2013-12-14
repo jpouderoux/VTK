@@ -63,10 +63,6 @@ public:
                            int legendIndex);
 
   // Description:
-  // Get the bounds for this mapper as (Xmin,Xmax,Ymin,Ymax,Zmin,Zmax).
-  virtual void GetBounds(double bounds[4]);
-
-  // Description:
   // This is a convenience function to set the input table.
   virtual void SetInputData(vtkTable *table);
   virtual void SetInputData(vtkTable *table, const vtkStdString&,
@@ -77,8 +73,8 @@ public:
 
   // Description:
   // Function to query a plot for the nearest point to the specified coordinate.
-  // Returns the index of the data series with which the point is associated or
-  // -1.
+  // Returns the index of the data series with which the point is associated
+  // or -1.
   virtual vtkIdType GetNearestPoint(const vtkVector2f& point,
                                     const vtkVector2f& tolerance,
                                     vtkVector2f* location);
@@ -88,18 +84,14 @@ public:
   void SetLookupTable(vtkScalarsToColors *lut);
   vtkScalarsToColors *GetLookupTable();
 
+  // Description:
+  // Helper function to set the color of a given column.
   void SetColumnColor(const vtkStdString& colName, double *rgb);
 
   // Description:
   // Create default lookup table. Generally used to create one when none
   // is available with the scalar data.
   virtual void CreateDefaultLookupTable();
-
-  // Description:
-  // Turn on/off flag to control whether scalar data is used to color objects.
-  vtkSetMacro(ScalarVisibility,int);
-  vtkGetMacro(ScalarVisibility,int);
-  vtkBooleanMacro(ScalarVisibility,int);
 
   // Description:
   // Get/Set the width of boxes.
@@ -110,6 +102,8 @@ public:
 protected:
   vtkPlotBox();
   ~vtkPlotBox();
+
+  void DrawBoxPlot(int, unsigned char*, double, vtkContext2D*);
 
   // Description:
   // Update the table cache.
@@ -124,12 +118,13 @@ protected:
   // The point cache is marked dirty until it has been initialized.
   vtkTimeStamp BuildTime;
 
+  // Description:
+  // Width of boxes.
   float BoxWidth;
 
   // Description:
   // Lookup Table for coloring points by scalar value
   vtkScalarsToColors *LookupTable;
-  int ScalarVisibility;
 
 private:
   vtkPlotBox(const vtkPlotBox &); // Not implemented.

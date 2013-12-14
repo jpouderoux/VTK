@@ -50,12 +50,8 @@ class vtkPlotBox::Private :
 public:
   Private()
   {
-    this->SelectionInitialized = false;
   }
-
-  bool SelectionInitialized;
 };
-
 
 //-----------------------------------------------------------------------------
 vtkStandardNewMacro(vtkPlotBox)
@@ -63,11 +59,10 @@ vtkStandardNewMacro(vtkPlotBox)
 //-----------------------------------------------------------------------------
 vtkPlotBox::vtkPlotBox()
 {
-  this->Storage = new vtkPlotBox::Private;
+  this->Storage = new vtkPlotBox::Private();
   this->Pen->SetColor(255, 0, 0, 25);
   this->BoxWidth = 20.;
   this->LookupTable = 0;
-  this->ScalarVisibility = 0;
   this->TooltipDefaultLabelFormat = "%y";
 }
 
@@ -118,10 +113,9 @@ bool vtkPlotBox::Paint(vtkContext2D *painter)
     return false;
     }
 
-  size_t cols = this->Storage->size();
-
   vtkChartBox *parent = vtkChartBox::SafeDownCast(this->Parent);
 
+  size_t cols = this->Storage->size();
   for (int i = 0; i < cols; i++)
     {
     vtkStdString colName = parent->GetVisibleColumns()->GetValue(i);
@@ -129,62 +123,68 @@ bool vtkPlotBox::Paint(vtkContext2D *painter)
     this->GetInput()->GetRowData()->GetAbstractArray(colName.c_str(), index);
     double rgb[4];
     this->LookupTable->GetIndexedColor(index, rgb);
-    vtkNew<vtkBrush> brush;
-    brush->SetColor(rgb[0] * 255., rgb[1] * 255, rgb[2] * 255, 255);
-    vtkNew<vtkPen> blackPen;
-    blackPen->SetWidth(this->Pen->GetWidth());
-    blackPen->SetColor(0, 0, 0, 128);
-    blackPen->SetOpacity(255);
+    unsigned char crgba[4] = { rgb[0] * 255., rgb[1] * 255, rgb[2] * 255, 255 };
 
     if (parent->GetSelectedColumn() == i)
       {
-      unsigned char* col = brush->GetColor();
-      brush->SetColor(col[0]^255, col[1]^255, col[2]^255, 255);
+      crgba[0] = crgba[0]^255;
+      crgba[1] = crgba[1]^255;
+      crgba[2] = crgba[2]^255;
       }
-
-    painter->ApplyPen(blackPen.GetPointer());
-    painter->ApplyBrush(brush.GetPointer());
-
-    // Helper variables for x position
-    double x = parent->GetAxis(int(i))->GetPoint1()[0];
-    double xpos = x + 0.5 * this->BoxWidth;
-    double xneg = x - 0.5 * this->BoxWidth;
-    double hBoxW = this->BoxWidth * 0.25;
-
-    // Fetch the quartiles and median
-    double q[5];
-    for (int j = 0; j < 5; j++)
-      {
-      q[j] = (*this->Storage)[i][j];
-      }
-    std::sort(q, q+5);
-
-    // Draw the box
-    painter->DrawQuad(xpos, q[1], xneg, q[1], xneg, q[3], xpos, q[3]);
-
-    // Draw the whiskers: ends of the whiskers match the
-    // extremum values of the quartiles
-    painter->DrawLine(x, q[0], x, q[1]);
-    painter->DrawLine(x - hBoxW, q[0], x + hBoxW, q[0]);
-    painter->DrawLine(x, q[3], x, q[4]);
-    painter->DrawLine(x - hBoxW, q[4], x + hBoxW, q[4]);
-
-    // Draw the median
-    vtkNew<vtkPen> whitePen;
-    unsigned char brushColor[4];
-    brush->GetColor(brushColor);
-    // Use a gray pen if the brush is black so the median is always visible
-    if (brushColor[0] == 0 && brushColor[1] == 0 && brushColor[2] == 0)
-      {
-      whitePen->SetWidth(std::max(1.0, this->Pen->GetWidth() - 1.0));
-      whitePen->SetColor(128, 128, 128, 128);
-      whitePen->SetOpacity(this->Pen->GetOpacity());
-      painter->ApplyPen(whitePen.GetPointer());
-      }
-    painter->DrawLine(xneg, q[2], xpos, q[2]);
-  }
+    DrawBoxPlot(i, crgba, parent->GetAxis(int(i))->GetPoint1()[0], painter);
+    }
 
   return true;
+}
+
+//-----------------------------------------------------------------------------
+void vtkPlotBox::DrawBoxPlot(int i, unsigned char *rgba, double x, vtkContext2D *painter)
+{
+  vtkNew<vtkBrush> brush;
+  brush->SetColor(rgba);
+  vtkNew<vtkPen> blackPen;
+  blackPen->SetWidth(this->Pen->GetWidth());
+  blackPen->SetColor(0, 0, 0, 128);
+  blackPen->SetOpacity(255);
+  painter->ApplyPen(blackPen.GetPointer());
+  painter->ApplyBrush(brush.GetPointer());
+
+  // Helper variables for x position
+  double xpos = x + 0.5 * this->BoxWidth;
+  double xneg = x - 0.5 * this->BoxWidth;
+  double hBoxW = this->BoxWidth * 0.25;
+
+  // Fetch the quartiles and median
+  double q[5];
+  for (int j = 0; j < 5; j++)
+    {
+    q[j] = (*this->Storage)[i][j];
+    }
+  std::sort(q, q+5);
+
+  // Draw the box
+  painter->DrawQuad(xpos, q[1], xneg, q[1], xneg, q[3], xpos, q[3]);
+
+  // Draw the whiskers: ends of the whiskers match the
+  // extremum values of the quartiles
+  painter->DrawLine(x, q[0], x, q[1]);
+  painter->DrawLine(x - hBoxW, q[0], x + hBoxW, q[0]);
+  painter->DrawLine(x, q[3], x, q[4]);
+  painter->DrawLine(x - hBoxW, q[4], x + hBoxW, q[4]);
+
+  // Draw the median
+  vtkNew<vtkPen> whitePen;
+  unsigned char brushColor[4];
+  brush->GetColor(brushColor);
+  // Use a gray pen if the brush is black so the median is always visible
+  if (brushColor[0] == 0 && brushColor[1] == 0 && brushColor[2] == 0)
+    {
+    whitePen->SetWidth(std::max(1.0, this->Pen->GetWidth() - 1.0));
+    whitePen->SetColor(128, 128, 128, 128);
+    whitePen->SetOpacity(this->Pen->GetOpacity());
+    painter->ApplyPen(whitePen.GetPointer());
+    }
+  painter->DrawLine(xneg, q[2], xpos, q[2]);
 }
 
 //-----------------------------------------------------------------------------
@@ -192,11 +192,6 @@ bool vtkPlotBox::PaintLegend(vtkContext2D *painter,
                              const vtkRectf& rect, int)
 {
   return true;
-}
-
-//-----------------------------------------------------------------------------
-void vtkPlotBox::GetBounds(double *)
-{
 }
 
 //-----------------------------------------------------------------------------
@@ -208,8 +203,9 @@ void vtkPlotBox::SetInputData(vtkTable* table)
     return;
     }
 
-  bool updateVisibility = table != this->Data->GetInput();
   this->vtkPlot::SetInputData(table);
+
+  bool updateVisibility = table != this->Data->GetInput();
   vtkChartBox *parent = vtkChartBox::SafeDownCast(this->Parent);
 
   if (parent && table && updateVisibility)
@@ -226,12 +222,14 @@ void vtkPlotBox::SetInputData(vtkTable* table)
     // No table, therefore no visible columns
     parent->GetVisibleColumns()->SetNumberOfTuples(0);
     }
+  // Create a default lookup table is non set yet
   if (!this->LookupTable)
     {
     this->CreateDefaultLookupTable();
     }
 }
 
+//-----------------------------------------------------------------------------
 namespace
 {
 // See if the point is within tolerance.
