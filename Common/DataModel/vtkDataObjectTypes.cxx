@@ -40,6 +40,7 @@ PURPOSE.  See the above copyright notice for more information.
 #include  "vtkPolyData.h"
 #include  "vtkRectilinearGrid.h"
 #include  "vtkReebGraph.h"
+#include  "vtkRGrid.h"
 #include  "vtkSelection.h"
 #include  "vtkStructuredGrid.h"
 #include  "vtkStructuredPoints.h"
@@ -95,6 +96,7 @@ static const char* vtkDataObjectTypesStrings[] = {
   "vtkPistonDataObject",
   "vtkPath",
   "vtkUnstructuredGridBase",
+  "vtkRGrid",
   NULL
 };
 
@@ -273,6 +275,10 @@ vtkDataObject* vtkDataObjectTypes::NewDataObject(const char* type)
   else if(strcmp(type, "vtkPath") == 0)
     {
     return vtkPath::New();
+    }
+  else if(strcmp(type, "vtkRGrid") == 0)
+    {
+    return vtkRGrid::New();
     }
 /*
   //I am not doing this as it would force either making Common/DataModel dependent on

@@ -148,6 +148,7 @@ set(Module_SRCS
   vtkRectilinearGrid.cxx
   vtkReebGraph.cxx
   vtkReebGraphSimplificationMetric.cxx
+  vtkRGrid.cxx
   vtkSelection.cxx
   vtkSelectionNode.cxx
   vtkSimpleCellTessellator.cxx

@@ -23,6 +23,7 @@ vtk_add_test_cxx(NO_DATA NO_VALID NO_OUTPUT
   TestPolyhedron0.cxx
   TestPolyhedron1.cxx
   TestQuadraticPolygon.cxx
+  TestRGrid.cxx
   TestSelectionSubtract.cxx
   TestTreeBFSIterator.cxx
   TestTreeDFSIterator.cxx

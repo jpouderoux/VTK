@@ -34,6 +34,7 @@ SET(Module_SRCS
   vtkPointSetAlgorithm.cxx
   vtkPolyDataAlgorithm.cxx
   vtkRectilinearGridAlgorithm.cxx
+  vtkRGridAlgorithm.cxx
   vtkScalarTree.cxx
   vtkSimpleImageToImageFilter.cxx
   vtkSimpleScalarTree.cxx
