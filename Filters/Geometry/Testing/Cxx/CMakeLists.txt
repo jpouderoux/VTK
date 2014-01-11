@@ -2,6 +2,7 @@ vtk_add_test_cxx(
   TestExtractSurfaceNonLinearSubdivision.cxx
   TestImageDataToUniformGrid.cxx,NO_VALID
   TestProjectSphereFilter.cxx,NO_VALID
+  TestRGridGeometryFilter.cxx,NO_VALID
   TestStructuredAMRNeighbor.cxx,NO_VALID
   TestUniformGridGhostDataGenerator.cxx,NO_VALID
   TestUnstructuredGridGeometryFilter.cxx

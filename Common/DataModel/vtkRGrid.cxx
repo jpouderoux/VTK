@@ -44,8 +44,8 @@ vtkRGrid::vtkRGrid()
   this->Dimensions[1] = 0;
   this->Dimensions[2] = 0;
 
-  int extent[6] = {0, -1, 0, -1, 0, -1};
-  memcpy(this->Extent, extent, 6*sizeof(int));
+  int extent[6] = { 0, -1, 0, -1, 0, -1 };
+  memcpy(this->Extent, extent, 6 * sizeof(int));
 
   this->Information->Set(vtkDataObject::DATA_EXTENT_TYPE(), VTK_3D_EXTENT);
   this->Information->Set(vtkDataObject::DATA_EXTENT(), this->Extent, 6);
@@ -72,7 +72,6 @@ void vtkRGrid::CopyStructure(vtkDataSet *ds)
   this->SetExtent(sg->GetExtent());
 }
 
-
 //----------------------------------------------------------------------------
 void vtkRGrid::Initialize()
 {
@@ -88,6 +87,12 @@ void vtkRGrid::Initialize()
 int vtkRGrid::GetCellType(vtkIdType vtkNotUsed(cellId))
 {
   return VTK_HEXAHEDRON;
+}
+
+//----------------------------------------------------------------------------
+vtkIdType vtkRGrid::GetNumberOfCells()
+{
+  return this->Dimensions[0] * this->Dimensions[1] * this->Dimensions[2];
 }
 
 //----------------------------------------------------------------------------
@@ -131,7 +136,7 @@ vtkCell *vtkRGrid::GetCell(vtkIdType cellId)
 void vtkRGrid::GetCell(vtkIdType cellId, vtkGenericCell *cell)
 {
   // Make sure data is defined
-  if (! this->Points)
+  if (!this->Points)
     {
     vtkErrorMacro (<<"No data");
     }
@@ -169,7 +174,7 @@ void vtkRGrid::GetCell(vtkIdType cellId, vtkGenericCell *cell)
 void vtkRGrid::GetCellBounds(vtkIdType cellId, double bounds[6])
 {
   // Make sure data is defined
-  if (! this->Points)
+  if (!this->Points)
     {
     vtkErrorMacro (<<"No data");
     return;
@@ -213,7 +218,7 @@ void vtkRGrid::GetCellBounds(vtkIdType cellId, double bounds[6])
 //----------------------------------------------------------------------------
 void vtkRGrid::GetCellDims(int cellDims[3])
 {
-  for (int i=0; i < 3; ++i)
+  for (int i = 0; i < 3; ++i)
     {
     cellDims[i] = ((this->Dimensions[i]-1) < 1) ? 1 : this->Dimensions[i]-1;
     }
@@ -267,12 +272,13 @@ void vtkRGrid::SetExtent(int extent[6])
   this->Dimensions[0] = extent[1] - extent[0] + 1;
   this->Dimensions[1] = extent[3] - extent[2] + 1;
   this->Dimensions[2] = extent[5] - extent[4] + 1;
+  memcpy(this->Extent, extent, 6 * sizeof(int));
 }
 
 //----------------------------------------------------------------------------
 void vtkRGrid::SetExtent(int xMin, int xMax,
-                                  int yMin, int yMax,
-                                  int zMin, int zMax)
+                         int yMin, int yMax,
+                         int zMin, int zMax)
 {
   int extent[6];
 
@@ -283,13 +289,15 @@ void vtkRGrid::SetExtent(int xMin, int xMax,
   this->SetExtent(extent);
 }
 
-int *vtkRGrid::GetDimensions ()
+//----------------------------------------------------------------------------
+int* vtkRGrid::GetDimensions()
 {
   this->GetDimensions(this->Dimensions);
   return this->Dimensions;
 }
 
-void vtkRGrid::GetDimensions (int dim[3])
+//----------------------------------------------------------------------------
+void vtkRGrid::GetDimensions(int dim[3])
 {
   const int* extent = this->Extent;
   dim[0] = extent[1] - extent[0] + 1;
@@ -299,25 +307,9 @@ void vtkRGrid::GetDimensions (int dim[3])
 
 //----------------------------------------------------------------------------
 void vtkRGrid::GetCellNeighbors(vtkIdType cellId, vtkIdList *ptIds,
-                                         vtkIdList *cellIds)
+                                vtkIdList *cellIds)
 {
-  int numPtIds = ptIds->GetNumberOfIds();
-
-  // Use special methods for speed
-  switch (numPtIds)
-    {
-    //case 0:
-    //  cellIds->Reset();
-    //  return;
-
-    //case 1: case 2: case 4: //vertex, edge, face neighbors
-    //  vtkStructuredData::GetCellNeighbors(cellId, ptIds,
-    //                                      cellIds, this->GetDimensions());
-    //  break;
-
-    default:
-      this->vtkDataSet::GetCellNeighbors(cellId, ptIds, cellIds);
-    }
+  this->vtkDataSet::GetCellNeighbors(cellId, ptIds, cellIds);
 }
 
 //----------------------------------------------------------------------------
@@ -331,7 +323,7 @@ void vtkRGrid::ShallowCopy(vtkDataObject *dataObject)
 {
   vtkRGrid *grid = vtkRGrid::SafeDownCast(dataObject);
 
-  if (grid != NULL)
+  if (grid)
     {
     this->InternalRGridCopy(grid);
     }
@@ -344,9 +336,9 @@ void vtkRGrid::ShallowCopy(vtkDataObject *dataObject)
 //----------------------------------------------------------------------------
 void vtkRGrid::DeepCopy(vtkDataObject *dataObject)
 {
-  vtkRGrid *grid = vtkRGrid::SafeDownCast(dataObject);
+  vtkRGrid* grid = vtkRGrid::SafeDownCast(dataObject);
 
-  if (grid != NULL)
+  if (grid)
     {
     this->InternalRGridCopy(grid);
     }
@@ -359,16 +351,11 @@ void vtkRGrid::DeepCopy(vtkDataObject *dataObject)
 // This copies all the local variables (but not objects).
 void vtkRGrid::InternalRGridCopy(vtkRGrid *src)
 {
-  int idx;
-
   // Update dimensions
   this->GetDimensions();
 
-  for (idx = 0; idx < 3; ++idx)
-    {
-    this->Dimensions[idx] = src->Dimensions[idx];
-    }
-  memcpy(this->Extent, src->GetExtent(), 6*sizeof(int));
+  memcpy(this->Dimensions, src->Dimensions, 3 * sizeof(int));
+  memcpy(this->Extent, src->GetExtent(), 6 * sizeof(int));
 }
 
 //----------------------------------------------------------------------------
@@ -379,19 +366,16 @@ void vtkRGrid::ComputeScalarRange()
     {
     vtkDataArray *ptScalars = this->PointData->GetScalars();
     vtkDataArray *cellScalars = this->CellData->GetScalars();
-    double ptRange[2];
-    double cellRange[2];
-    double s;
-    int id, num;
 
-    ptRange[0] =  VTK_DOUBLE_MAX;
-    ptRange[1] =  VTK_DOUBLE_MIN;
+    double ptRange[2];
+    ptRange[0] = VTK_DOUBLE_MAX;
+    ptRange[1] = VTK_DOUBLE_MIN;
     if (ptScalars)
       {
-      num = this->GetNumberOfPoints();
-      for (id=0; id < num; id++)
+      int num = this->GetNumberOfPoints();
+      for (int id = 0; id < num; id++)
         {
-        s = ptScalars->GetComponent(id,0);
+        double s = ptScalars->GetComponent(id, 0);
         if (s < ptRange[0])
           {
           ptRange[0] = s;
@@ -403,14 +387,15 @@ void vtkRGrid::ComputeScalarRange()
         }
       }
 
-    cellRange[0] =  ptRange[0];
-    cellRange[1] =  ptRange[1];
+    double cellRange[2];
+    cellRange[0] = ptRange[0];
+    cellRange[1] = ptRange[1];
     if (cellScalars)
       {
-      num = this->GetNumberOfCells();
-      for (id=0; id < num; id++)
+      int num = this->GetNumberOfCells();
+      for (int id = 0; id < num; id++)
         {
-        s = cellScalars->GetComponent(id,0);
+        double s = cellScalars->GetComponent(id, 0);
         if (s < cellRange[0])
           {
           cellRange[0] = s;
@@ -428,7 +413,6 @@ void vtkRGrid::ComputeScalarRange()
     this->ScalarRangeComputeTime.Modified();
     }
 }
-
 
 //----------------------------------------------------------------------------
 void vtkRGrid::Crop(const int* updateExtent)
@@ -541,7 +525,6 @@ void vtkRGrid::Crop(const int* updateExtent)
     }
 }
 
-
 //----------------------------------------------------------------------------
 void vtkRGrid::PrintSelf(ostream& os, vtkIndent indent)
 {
@@ -572,40 +555,4 @@ vtkRGrid* vtkRGrid::GetData(vtkInformation* info)
 vtkRGrid* vtkRGrid::GetData(vtkInformationVector* v, int i)
 {
   return vtkRGrid::GetData(v->GetInformationObject(i));
-}
-
-//----------------------------------------------------------------------------
-void vtkRGrid::GetPoint(
-    int i, int j, int k, double p[3], bool adjustForExtent)
-{
-  int extent[6];
-  this->GetExtent(extent);
-
-  if(i < extent[0] || i > extent[1] ||
-     j < extent[2] || j > extent[3] ||
-     k < extent[4] || k > extent[5])
-    {
-    vtkErrorMacro("ERROR: IJK coordinates are outside of grid extent!");
-    return; // out of bounds!
-    }
-
-  int pos[3];
-  pos[0] = i;
-  pos[1] = j;
-  pos[2] = k;
-
-  vtkIdType id = 0;
-
-  if(adjustForExtent)
-    {
-    //id = vtkRData::ComputePointIdForExtent(extent, pos);
-    }
-  else
-    {
-    int dim[3];
-    this->GetDimensions(dim);
-    //id = vtkRData::ComputePointId(dim, pos);
-    }
-
-  this->GetPoint(id, p);
 }

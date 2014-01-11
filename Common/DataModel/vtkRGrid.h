@@ -90,8 +90,8 @@ public:
 
   // Description:
   // Get dimensions of this structured points dataset.
-  virtual int *GetDimensions ();
-  virtual void GetDimensions (int dim[3]);
+  virtual int *GetDimensions();
+  virtual void GetDimensions(int dim[3]);
 
   // Description:
   // Return the dimensionality of the data.
@@ -128,7 +128,7 @@ public:
   // node dimensions. The value in each dimension can will have a lowest value
   // of "1" such that computing the total number of cells can be achieved by
   // simply by cellDims[0]*cellDims[1]*cellDims[2].
-  void GetCellDims( int cellDims[3] );
+  void GetCellDims(int cellDims[3]);
 
   // Description:
   // Reallocates and copies to set the Extent to the UpdateExtent.
@@ -142,16 +142,6 @@ public:
   static vtkRGrid* GetData(vtkInformation* info);
   static vtkRGrid* GetData(vtkInformationVector* v, int i=0);
   //ETX
-
-  // Description:
-  // Get a point in the grid. If adjustForExtent is true, (i,j,k) is
-  // interpreted as a position relative to the beginning of the extent.
-  // If adjustForExtent is false, (i,j,k) is interpreted literally
-  // and the (i,j,k) point of the grid is returned regardless of the
-  // extent beginning.
-  // The point coordinate is returned in 'p'.
-  // The default adjustForExtent is true.
-  void GetPoint(int i, int j, int k, double p[3], bool adjustForExtent = true);
 
 protected:
   vtkRGrid();
@@ -171,11 +161,6 @@ protected:
   virtual void ComputeScalarRange();
 
 private:
-  // Description:
-  // For legacy compatibility. Do not use.
-  void GetCellNeighbors(vtkIdType cellId, vtkIdList& ptIds, vtkIdList& cellIds)
-    {this->GetCellNeighbors(cellId, &ptIds, &cellIds);}
-
   // Internal method used by DeepCopy and ShallowCopy.
   void InternalRGridCopy(vtkRGrid *src);
 
@@ -183,28 +168,5 @@ private:
   vtkRGrid(const vtkRGrid&);  // Not implemented.
   void operator=(const vtkRGrid&);  // Not implemented.
 };
-
-
-inline vtkIdType vtkRGrid::GetNumberOfCells()
-{
-  int nCells=1;
-  int dims[3];
-  int i;
-
-  this->GetDimensions(dims);
-  for (i=0; i<3; i++)
-    {
-    if (dims[i] <= 0)
-      {
-      return 0;
-      }
-    if (dims[i] > 1)
-      {
-      nCells *= (dims[i]-1);
-      }
-    }
-
-  return nCells;
-}
 
 #endif
