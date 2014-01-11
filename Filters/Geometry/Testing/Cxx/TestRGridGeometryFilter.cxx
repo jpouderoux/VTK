@@ -23,14 +23,12 @@
 #include "vtkRenderWindow.h"
 #include "vtkRenderWindowInteractor.h"
 #include "vtkXMLUnstructuredGridReader.h"
-#include <cassert>
 #include "vtkLookupTable.h"
 #include "vtkPolyData.h"
 #include "vtkUnstructuredGridGeometryFilter.h"
 #include "vtkDataSetSurfaceFilter.h"
 #include "vtkGeometryFilter.h"
 #include "vtkPolyDataMapper.h"
-#include "vtkTimerLog.h"
 #include "vtkCamera.h"
 #include "vtkPointData.h"
 #include "vtkProperty.h"
@@ -47,9 +45,9 @@ int TestRGridGeometryFilter(int argc, char* argv[])
   const int si = 60;
   const int sj = 50;
   const int sk = 20;
-  const int si1 = si+1;
+  const int si1 = si+3;
   const int sj1 = sj+2;
-  const int sk1 = sk+2;
+  const int sk1 = sk+1;
 
   pts->SetNumberOfPoints(si1 * sj1 * sk1);
   for (int k = 0, ijk = 0; k < sk1; k++)
@@ -64,10 +62,10 @@ int TestRGridGeometryFilter(int argc, char* argv[])
         if (i > 30)
           {
           x -= 1;
-          z = k + 0.7;
-          if ( i > 50)
+          z = k + 1.0;
+          if (i > 50)
             {
-            x = x-1;
+            x -= 1;
             z = k + 2.4;
             }
           }
@@ -83,7 +81,7 @@ int TestRGridGeometryFilter(int argc, char* argv[])
 
   vtkNew<vtkDoubleArray> scalars;
   scalars->SetName("scalars");
-  scalars->SetNumberOfValues(si*sj*sk);
+  scalars->SetNumberOfValues(si * sj * sk);
 
   vtkNew<vtkCellArray> cells;
   cells->Allocate(9 * si * sj * sk);
@@ -94,16 +92,32 @@ int TestRGridGeometryFilter(int argc, char* argv[])
       {
       for (int i = 0; i < si; i++, ijk++)
         {
-        cells->InsertNextCell(8);
-        cells->InsertCellPoint(i   + j     * si1 + k * sj1 * si1);
-        cells->InsertCellPoint(i+1 + j     * si1 + k * sj1 * si1);
-        cells->InsertCellPoint(i+1 + (j+1) * si1 + k * sj1 * si1);
-        cells->InsertCellPoint(i   + (j+1) * si1 + k * sj1 * si1);
+        int x = i;
+        int y = j;
+        int z = k;
+        if (i >= 30)
+          {
+          x++;
+          if (i >= 49)
+            {
+            x++;
+            }
+          }
+        if (j >= 20)
+          {
+          y++;
+          }
+#define CTOI(_i,_j,_k) _i + (_j) * si1 + (_k) * sj1 * si1
 
-        cells->InsertCellPoint(i   + j     * si1 + (k+1) * sj1 * si1);
-        cells->InsertCellPoint(i+1 + j     * si1 + (k+1) * sj1 * si1);
-        cells->InsertCellPoint(i+1 + (j+1) * si1 + (k+1) * sj1 * si1);
-        cells->InsertCellPoint(i   + (j+1) * si1 + (k+1) * sj1 * si1);
+        cells->InsertNextCell(8);
+        for (int kk = 0; kk < 2; kk++)
+          {
+          cells->InsertCellPoint(CTOI(x,   y,   z+kk));
+          cells->InsertCellPoint(CTOI(x+1, y,   z+kk));
+          cells->InsertCellPoint(CTOI(x+1, y+1, z+kk));
+          cells->InsertCellPoint(CTOI(x,   y+1, z+kk));
+          }
+
         scalars->SetValue(ijk, k);
         }
       }
@@ -118,17 +132,6 @@ int TestRGridGeometryFilter(int argc, char* argv[])
 
   cout << grid->GetNumberOfCells() << " cells "
     << grid->GetNumberOfPoints() << " pts "<< endl;
-  vtkNew<vtkIdList> ids;
-  grid->GetPointCells(62+(61*51), ids.GetPointer());
-  //grid->PrintSelf(cout, vtkIndent());
-  for (int i=0; i < ids->GetNumberOfIds(); i++)
-    cout << i << ": " << ids->GetId(i) << endl;
-  ids->PrintSelf(cout, vtkIndent());
-  vtkCell* c = grid->GetCell(0);
-  c->PrintSelf(cout, vtkIndent());
-  c = grid->GetCell(1);
-  c->PrintSelf(cout, vtkIndent());
-  cout << "---------------" << endl;
 
   vtkNew<vtkDataSetSurfaceFilter> surface;
   surface->SetInputData(grid.GetPointer());
@@ -154,12 +157,9 @@ int TestRGridGeometryFilter(int argc, char* argv[])
   mapper->SetInputConnection(0, surface->GetOutputPort(0));
   mapper->SetScalarRange(0, sk);
 
-
-
   vtkNew<vtkActor> actor;
   actor->SetMapper(mapper.GetPointer());
   renderer->AddActor(actor.GetPointer());
-
 
   vtkNew<vtkPolyDataMapper> wmapper;
   wmapper->SetInputConnection(0, surface->GetOutputPort(0));
@@ -167,14 +167,14 @@ int TestRGridGeometryFilter(int argc, char* argv[])
 
   vtkNew<vtkActor> wactor;
   wactor->SetMapper(wmapper.GetPointer());
-  wactor->GetProperty()->SetColor(0,0,0);
+  wactor->GetProperty()->SetColor(0, 0, 0);
   wactor->GetProperty()->SetRepresentationToWireframe();
   renderer->AddActor(wactor.GetPointer());
 
   // Standard testing code.
   //renWin->SetMultiSamples(0);
   renderer->SetBackground(0.5, 0.5, 0.5);
-  renWin->SetSize(300, 300);
+  renWin->SetSize(900, 900);
   renWin->Render();
   int retVal = vtkRegressionTestImage(renWin.GetPointer());
  // if ( retVal == vtkRegressionTester::DO_INTERACTOR)

@@ -79,6 +79,7 @@ public:
   vtkIdType GetNumberOfCells();
   void GetCellPoints(vtkIdType cellId, vtkIdList *ptIds);
   void GetPointCells(vtkIdType ptId, vtkIdList *cellIds);
+  void GetCellPoints(vtkIdType cellId, vtkIdType& npts, vtkIdType* &pts);
 
   void Initialize();
   int GetMaxCellSize() {return 8;}; //hexahedron is the largest
@@ -103,7 +104,9 @@ public:
   vtkCellArray *GetCells() { return this->Cells; }
 
   void BuildLinks();
-  vtkCellLinks *GetCellLinks() {return this->Links;};
+  vtkCellLinks *GetCellLinks() { return this->Links; }
+
+  void GetCellCoordinates(vtkIdType cellId, int &i, int &j, int &k);
 
   // Description:
   // Different ways to set the extent of the data array.  The extent
@@ -167,6 +170,9 @@ protected:
   // Compute the range of the scalars and cache it into ScalarRange
   // only if the cache became invalid (ScalarRangeComputeTime).
   virtual void ComputeScalarRange();
+
+  void GetCell(vtkIdType, vtkCell*);
+  vtkIdType* GetCellPoints(vtkIdType cellId);
 
   vtkCellArray* Cells;
   vtkCellLinks* Links;

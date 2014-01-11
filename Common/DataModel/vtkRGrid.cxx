@@ -119,45 +119,23 @@ void vtkRGrid::BuildLinks()
 //----------------------------------------------------------------------------
 vtkCell *vtkRGrid::GetCell(vtkIdType cellId)
 {
-  // Make sure data is defined
-  if (!this->Points || !this->Cells)
-    {
-    vtkErrorMacro (<<"No data");
-    return NULL;
-    }
-
-  // Update dimensions
-  this->GetDimensions();
-
   vtkCell* cell = this->Hexahedron;
-
-  vtkIdType *indices = this->Cells->GetData()->GetPointer(cellId * 9) + 1;
-  cell->PointIds->SetId(0, indices[0]);
-  cell->PointIds->SetId(1, indices[1]);
-  cell->PointIds->SetId(2, indices[2]);
-  cell->PointIds->SetId(3, indices[3]);
-  cell->PointIds->SetId(4, indices[4]);
-  cell->PointIds->SetId(5, indices[5]);
-  cell->PointIds->SetId(6, indices[6]);
-  cell->PointIds->SetId(7, indices[7]);
-
-  // Extract point coordinates and point ids. NOTE: the ordering of the
-  // vtkHexahedron cells are tricky.
-  int NumberOfIds = cell->PointIds->GetNumberOfIds();
-  for (int i = 0; i < NumberOfIds; i++)
-    {
-    vtkIdType idx = cell->PointIds->GetId(i);
-    cell->Points->SetPoint(i, this->Points->GetPoint(idx));
-    }
-
+  this->GetCell(cellId, static_cast<vtkCell*>(cell));
   return cell;
 }
 
 //----------------------------------------------------------------------------
 void vtkRGrid::GetCell(vtkIdType cellId, vtkGenericCell *cell)
 {
+  cell->SetCellTypeToHexahedron();
+  this->GetCell(cellId, static_cast<vtkCell*>(cell));
+}
+
+//----------------------------------------------------------------------------
+void vtkRGrid::GetCell(vtkIdType cellId, vtkCell *cell)
+{
   // Make sure data is defined
-  if (!this->Points)
+  if (!this->Points || !this->Cells)
     {
     vtkErrorMacro (<<"No data");
     }
@@ -165,9 +143,7 @@ void vtkRGrid::GetCell(vtkIdType cellId, vtkGenericCell *cell)
   // Update dimensions
   this->GetDimensions();
 
-  cell->SetCellTypeToHexahedron();
-
-  vtkIdType *indices = this->Cells->GetData()->GetPointer(cellId * 9) + 1;
+  vtkIdType *indices = this->GetCellPoints(cellId);
   cell->PointIds->SetId(0, indices[0]);
   cell->PointIds->SetId(1, indices[1]);
   cell->PointIds->SetId(2, indices[2]);
@@ -206,7 +182,7 @@ void vtkRGrid::GetCellBounds(vtkIdType cellId, double bounds[6])
   // Update dimensions
   this->GetDimensions();
 
-  vtkIdType *indices = this->Cells->GetData()->GetPointer(cellId * 9) + 1;
+  vtkIdType *indices = this->GetCellPoints(cellId);
   double x[3];
 
   this->Points->GetPoint(indices[0], x);
@@ -262,53 +238,26 @@ void vtkRGrid::SetDimensions(int dim[3])
 //----------------------------------------------------------------------------
 void vtkRGrid::GetPointCells(vtkIdType ptId, vtkIdList *cellIds)
 {
- vtkIdType *cells;
-  int numCells;
-  int i;
-
-  if ( ! this->Links )
+  if (!this->Links)
     {
     this->BuildLinks();
     }
   cellIds->Reset();
 
-  numCells = this->Links->GetNcells(ptId);
-  cells = this->Links->GetCells(ptId);
+  int numCells = this->Links->GetNcells(ptId);
+  vtkIdType* cells = this->Links->GetCells(ptId);
 
   cellIds->SetNumberOfIds(numCells);
-  for (i=0; i < numCells; i++)
+  for (int i = 0; i < numCells; i++)
     {
-    cellIds->SetId(i,cells[i]);
+    cellIds->SetId(i, cells[i]);
     }
-  /*
-  const int si = this->Dimensions[0];
-  const int sj = this->Dimensions[1];
-  const int sk = this->Dimensions[2];
+}
 
-  int idk = ptId / ((si+1) * (sj+1));
-  int rdk = (ptId % ((si+1) * (sj+1)));
-  int idj = rdk / (si+1);
-  int idi = rdk % (si+1);
-
-  for (int k = -1; k < 1; k++)
-    {
-    for (int j = -1; j < 1; j++)
-      {
-      for (int i = -1; i < 1; i++)
-        {
-        int ii = idi + i;
-        int jj = idj + j;
-        int kk = idk + k;
-        if (ii >= 0 && ii < si &&
-            jj >= 0 && jj < sj &&
-            kk >= 0 && kk < sk)
-          {
-          cellIds->InsertNextId(ii + jj * si + kk * si * sk);
-          }
-        }
-      }
-    }
-  */
+//----------------------------------------------------------------------------
+vtkIdType* vtkRGrid::GetCellPoints(vtkIdType cellId)
+{
+  return this->Cells->GetData()->GetPointer(cellId * 9) + 1;
 }
 
 //----------------------------------------------------------------------------
@@ -321,7 +270,7 @@ void vtkRGrid::GetCellPoints(vtkIdType cellId, vtkIdList *ptIds)
   ptIds->Reset();
 
   ptIds->SetNumberOfIds(8);
-  vtkIdType *indices = this->Cells->GetData()->GetPointer(cellId * 9) + 1;
+  vtkIdType *indices = this->GetCellPoints(cellId);
 
   ptIds->SetId(0, indices[0]);
   ptIds->SetId(1, indices[1]);
@@ -331,6 +280,35 @@ void vtkRGrid::GetCellPoints(vtkIdType cellId, vtkIdList *ptIds)
   ptIds->SetId(5, indices[5]);
   ptIds->SetId(6, indices[6]);
   ptIds->SetId(7, indices[7]);
+}
+
+//----------------------------------------------------------------------------
+// Return a pointer to a list of point ids defining cell.
+// More efficient than alternative method.
+void vtkRGrid::GetCellPoints(vtkIdType cellId, vtkIdType& npts,
+                             vtkIdType* &pts)
+{
+  pts = this->GetCellPoints(cellId);
+  npts = 8;
+}
+
+//----------------------------------------------------------------------------
+void vtkRGrid::GetCellCoordinates(vtkIdType cellId, int &i, int &j, int &k)
+{
+  const int si = this->Dimensions[0];
+  const int sj = this->Dimensions[1];
+  i = j = k = 0;
+  if (sj == 0)
+    {
+    i = cellId;
+    }
+  else if (si > 0 && sj > 0)
+    {
+    i = cellId / (si * sj);
+    int jj = cellId % (si * sj);
+    j = jj / si;
+    k = jj % si;
+    }
 }
 
 //----------------------------------------------------------------------------
@@ -349,11 +327,9 @@ void vtkRGrid::SetExtent(int xMin, int xMax,
                          int zMin, int zMax)
 {
   int extent[6];
-
   extent[0] = xMin; extent[1] = xMax;
   extent[2] = yMin; extent[3] = yMax;
   extent[4] = zMin; extent[5] = zMax;
-
   this->SetExtent(extent);
 }
 
@@ -374,10 +350,75 @@ void vtkRGrid::GetDimensions(int dim[3])
 }
 
 //----------------------------------------------------------------------------
+// Determine neighbors as follows. Find the (shortest) list of cells that
+// uses one of the points in ptIds. For each cell, in the list, see whether
+// it contains the other points in the ptIds list. If so, it's a neighbor.
 void vtkRGrid::GetCellNeighbors(vtkIdType cellId, vtkIdList *ptIds,
                                 vtkIdList *cellIds)
 {
-  this->vtkDataSet::GetCellNeighbors(cellId, ptIds, cellIds);
+  if (!this->Links)
+    {
+    this->BuildLinks();
+    }
+
+  cellIds->Reset();
+
+  vtkIdType *minCells = 0;
+  vtkIdType minPtId = 0;
+
+  //Find the point used by the fewest number of cells
+
+  vtkIdType numPts = ptIds->GetNumberOfIds();
+  vtkIdType* pts = ptIds->GetPointer(0);
+  vtkIdType minNumCells = VTK_INT_MAX;
+  for (int i = 0; i < numPts; i++)
+    {
+    vtkIdType ptId = pts[i];
+    vtkIdType numCells = this->Links->GetNcells(ptId);
+    vtkIdType* cells = this->Links->GetCells(ptId);
+    if ( numCells < minNumCells )
+      {
+      minNumCells = numCells;
+      minCells = cells;
+      minPtId = ptId;
+      }
+    }
+
+  if (minNumCells == VTK_INT_MAX && numPts == 0)
+    {
+    vtkErrorMacro("input point ids empty.");
+    minNumCells = 0;
+    }
+
+  //Now for each cell, see if it contains all the points
+  //in the ptIds list.
+  for (int i = 0; i < minNumCells; i++)
+    {
+    if ( minCells[i] != cellId ) //don't include current cell
+      {
+      vtkIdType* cellPts = this->GetCellPoints(minCells[i]);
+      vtkIdType match = 1;
+      for (int j = 0; j < numPts && match; j++) //for all pts in input cell
+        {
+        if (pts[j] != minPtId) //of course minPtId is contained by cell
+          {
+          match = 0;
+          for (int k = 0; k < 8; k++) //for all points in candidate cell
+            {
+            if (pts[j] == cellPts[k])
+              {
+              match = 1; //a match was found
+              break;
+              }
+            }//for all points in current cell
+          }//if not guaranteed match
+        }//for all points in input cell
+      if (match)
+        {
+        cellIds->InsertNextId(minCells[i]);
+        }
+      }//if not the reference cell
+    }//for all candidate cells attached to point
 }
 
 //----------------------------------------------------------------------------
