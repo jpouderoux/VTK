@@ -14,7 +14,9 @@
 =========================================================================*/
 #include "vtkRGrid.h"
 
+#include "vtkCellArray.h"
 #include "vtkCellData.h"
+#include "vtkCellLinks.h"
 #include "vtkEmptyCell.h"
 #include "vtkGenericCell.h"
 #include "vtkHexahedron.h"
@@ -39,6 +41,9 @@ vtkRGrid::vtkRGrid()
 {
   this->Hexahedron = vtkHexahedron::New();
   this->EmptyCell = vtkEmptyCell::New();
+
+  this->Cells = 0;
+  this->Links = 0;
 
   this->Dimensions[0] = 0;
   this->Dimensions[1] = 0;
@@ -96,10 +101,26 @@ vtkIdType vtkRGrid::GetNumberOfCells()
 }
 
 //----------------------------------------------------------------------------
+void vtkRGrid::BuildLinks()
+{
+  // Remove the old links if they are already built
+  if (this->Links)
+    {
+    this->Links->UnRegister(this);
+    }
+
+  this->Links = vtkCellLinks::New();
+  this->Links->Allocate(this->GetNumberOfPoints());
+  this->Links->Register(this);
+  this->Links->BuildLinks(this, this->Cells);
+  this->Links->Delete();
+}
+
+//----------------------------------------------------------------------------
 vtkCell *vtkRGrid::GetCell(vtkIdType cellId)
 {
   // Make sure data is defined
-  if (!this->Points)
+  if (!this->Points || !this->Cells)
     {
     vtkErrorMacro (<<"No data");
     return NULL;
@@ -110,22 +131,22 @@ vtkCell *vtkRGrid::GetCell(vtkIdType cellId)
 
   vtkCell* cell = this->Hexahedron;
 
-  vtkIdType idx = cellId * 8;
-  cell->PointIds->SetId(0, idx);
-  cell->PointIds->SetId(1, idx + 1);
-  cell->PointIds->SetId(2, idx + 2);
-  cell->PointIds->SetId(3, idx + 3);
-  cell->PointIds->SetId(4, idx + 4);
-  cell->PointIds->SetId(5, idx + 5);
-  cell->PointIds->SetId(6, idx + 6);
-  cell->PointIds->SetId(7, idx + 7);
+  vtkIdType *indices = this->Cells->GetData()->GetPointer(cellId * 9) + 1;
+  cell->PointIds->SetId(0, indices[0]);
+  cell->PointIds->SetId(1, indices[1]);
+  cell->PointIds->SetId(2, indices[2]);
+  cell->PointIds->SetId(3, indices[3]);
+  cell->PointIds->SetId(4, indices[4]);
+  cell->PointIds->SetId(5, indices[5]);
+  cell->PointIds->SetId(6, indices[6]);
+  cell->PointIds->SetId(7, indices[7]);
 
   // Extract point coordinates and point ids. NOTE: the ordering of the
   // vtkHexahedron cells are tricky.
   int NumberOfIds = cell->PointIds->GetNumberOfIds();
   for (int i = 0; i < NumberOfIds; i++)
     {
-    idx = cell->PointIds->GetId(i);
+    vtkIdType idx = cell->PointIds->GetId(i);
     cell->Points->SetPoint(i, this->Points->GetPoint(idx));
     }
 
@@ -146,15 +167,15 @@ void vtkRGrid::GetCell(vtkIdType cellId, vtkGenericCell *cell)
 
   cell->SetCellTypeToHexahedron();
 
-  vtkIdType idx = cellId * 8;
-  cell->PointIds->SetId(0, idx);
-  cell->PointIds->SetId(1, idx + 1);
-  cell->PointIds->SetId(2, idx + 2);
-  cell->PointIds->SetId(3, idx + 3);
-  cell->PointIds->SetId(4, idx + 4);
-  cell->PointIds->SetId(5, idx + 5);
-  cell->PointIds->SetId(6, idx + 6);
-  cell->PointIds->SetId(7, idx + 7);
+  vtkIdType *indices = this->Cells->GetData()->GetPointer(cellId * 9) + 1;
+  cell->PointIds->SetId(0, indices[0]);
+  cell->PointIds->SetId(1, indices[1]);
+  cell->PointIds->SetId(2, indices[2]);
+  cell->PointIds->SetId(3, indices[3]);
+  cell->PointIds->SetId(4, indices[4]);
+  cell->PointIds->SetId(5, indices[5]);
+  cell->PointIds->SetId(6, indices[6]);
+  cell->PointIds->SetId(7, indices[7]);
 
   // Extract point coordinates and point ids. NOTE: the ordering of the
   // vtkHexahedron cells are tricky.
@@ -185,33 +206,33 @@ void vtkRGrid::GetCellBounds(vtkIdType cellId, double bounds[6])
   // Update dimensions
   this->GetDimensions();
 
-  vtkIdType idx = cellId * 8;
+  vtkIdType *indices = this->Cells->GetData()->GetPointer(cellId * 9) + 1;
   double x[3];
 
-  this->Points->GetPoint(idx, x);
+  this->Points->GetPoint(indices[0], x);
   bounds[0] = bounds[1] = x[0];
   bounds[2] = bounds[3] = x[1];
   bounds[4] = bounds[5] = x[2];
 
-  this->Points->GetPoint(idx + 1, x);
+  this->Points->GetPoint(indices[1], x);
   vtkAdjustBoundsMacro(bounds, x);
 
-  this->Points->GetPoint(idx + 2, x);
+  this->Points->GetPoint(indices[2], x);
   vtkAdjustBoundsMacro(bounds, x);
 
-  this->Points->GetPoint(idx + 3, x);
+  this->Points->GetPoint(indices[3], x);
   vtkAdjustBoundsMacro(bounds, x);
 
-  this->Points->GetPoint(idx + 4, x);
+  this->Points->GetPoint(indices[4], x);
   vtkAdjustBoundsMacro(bounds, x);
 
-  this->Points->GetPoint(idx + 5, x);
+  this->Points->GetPoint(indices[5], x);
   vtkAdjustBoundsMacro(bounds, x);
 
-  this->Points->GetPoint(idx + 6, x);
+  this->Points->GetPoint(indices[6], x);
   vtkAdjustBoundsMacro(bounds, x);
 
-  this->Points->GetPoint(idx + 7, x);
+  this->Points->GetPoint(indices[7], x);
   vtkAdjustBoundsMacro(bounds, x);
 }
 
@@ -241,7 +262,53 @@ void vtkRGrid::SetDimensions(int dim[3])
 //----------------------------------------------------------------------------
 void vtkRGrid::GetPointCells(vtkIdType ptId, vtkIdList *cellIds)
 {
-  cellIds->InsertNextId(ptId / 8);
+ vtkIdType *cells;
+  int numCells;
+  int i;
+
+  if ( ! this->Links )
+    {
+    this->BuildLinks();
+    }
+  cellIds->Reset();
+
+  numCells = this->Links->GetNcells(ptId);
+  cells = this->Links->GetCells(ptId);
+
+  cellIds->SetNumberOfIds(numCells);
+  for (i=0; i < numCells; i++)
+    {
+    cellIds->SetId(i,cells[i]);
+    }
+  /*
+  const int si = this->Dimensions[0];
+  const int sj = this->Dimensions[1];
+  const int sk = this->Dimensions[2];
+
+  int idk = ptId / ((si+1) * (sj+1));
+  int rdk = (ptId % ((si+1) * (sj+1)));
+  int idj = rdk / (si+1);
+  int idi = rdk % (si+1);
+
+  for (int k = -1; k < 1; k++)
+    {
+    for (int j = -1; j < 1; j++)
+      {
+      for (int i = -1; i < 1; i++)
+        {
+        int ii = idi + i;
+        int jj = idj + j;
+        int kk = idk + k;
+        if (ii >= 0 && ii < si &&
+            jj >= 0 && jj < sj &&
+            kk >= 0 && kk < sk)
+          {
+          cellIds->InsertNextId(ii + jj * si + kk * si * sk);
+          }
+        }
+      }
+    }
+  */
 }
 
 //----------------------------------------------------------------------------
@@ -253,16 +320,17 @@ void vtkRGrid::GetCellPoints(vtkIdType cellId, vtkIdList *ptIds)
 
   ptIds->Reset();
 
-  vtkIdType idx = cellId * 8;
   ptIds->SetNumberOfIds(8);
-  ptIds->SetId(0, idx);
-  ptIds->SetId(1, idx + 1);
-  ptIds->SetId(2, idx + 2);
-  ptIds->SetId(3, idx + 3);
-  ptIds->SetId(4, idx + 4);
-  ptIds->SetId(5, idx + 5);
-  ptIds->SetId(6, idx + 6);
-  ptIds->SetId(7, idx + 7);
+  vtkIdType *indices = this->Cells->GetData()->GetPointer(cellId * 9) + 1;
+
+  ptIds->SetId(0, indices[0]);
+  ptIds->SetId(1, indices[1]);
+  ptIds->SetId(2, indices[2]);
+  ptIds->SetId(3, indices[3]);
+  ptIds->SetId(4, indices[4]);
+  ptIds->SetId(5, indices[5]);
+  ptIds->SetId(6, indices[6]);
+  ptIds->SetId(7, indices[7]);
 }
 
 //----------------------------------------------------------------------------
@@ -331,6 +399,26 @@ void vtkRGrid::ShallowCopy(vtkDataObject *dataObject)
 
   // Do superclass
   this->vtkPointSet::ShallowCopy(dataObject);
+}
+
+//----------------------------------------------------------------------------
+void vtkRGrid::SetCells(vtkCellArray *cells)
+{
+  if (this->Cells == cells)
+    {
+    return;
+    }
+  if (this->Cells)
+    {
+    this->Cells->UnRegister(this);
+    this->Cells = 0;
+    }
+  this->Cells = cells;
+  if (this->Cells)
+    {
+    this->Cells->Register(this);
+    }
+  this->Modified();
 }
 
 //----------------------------------------------------------------------------

@@ -45,6 +45,8 @@
 #include "vtkRGrid.h" // Needed for inline methods
 
 class vtkEmptyCell;
+class vtkCellArray;
+class vtkCellLinks;
 class vtkHexahedron;
 class vtkUnsignedCharArray;
 
@@ -96,6 +98,12 @@ public:
   // Description:
   // Return the dimensionality of the data.
   int GetDataDimension() { return 3; }
+
+  void SetCells(vtkCellArray *cells);
+  vtkCellArray *GetCells() { return this->Cells; }
+
+  void BuildLinks();
+  vtkCellLinks *GetCellLinks() {return this->Links;};
 
   // Description:
   // Different ways to set the extent of the data array.  The extent
@@ -159,6 +167,9 @@ protected:
   // Compute the range of the scalars and cache it into ScalarRange
   // only if the cache became invalid (ScalarRangeComputeTime).
   virtual void ComputeScalarRange();
+
+  vtkCellArray* Cells;
+  vtkCellLinks* Links;
 
 private:
   // Internal method used by DeepCopy and ShallowCopy.
