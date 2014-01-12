@@ -22,6 +22,8 @@ set(Module_SRCS
   vtkStructuredGridPartitioner.cxx
   vtkStructuredNeighbor.cxx
   vtkUniformGridGhostDataGenerator.cxx
+
+  vtkRGridSlice.cxx
   )
 
 set_source_files_properties(

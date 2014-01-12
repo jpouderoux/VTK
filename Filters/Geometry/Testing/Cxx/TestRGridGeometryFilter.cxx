@@ -33,6 +33,7 @@
 #include "vtkPointData.h"
 #include "vtkProperty.h"
 #include "vtkRGrid.h"
+#include "vtkRGridSlice.h"
 #include "vtkPoints.h"
 #include "vtkShrinkFilter.h"
 #include "vtkCell.h"
@@ -133,9 +134,20 @@ int TestRGridGeometryFilter(int argc, char* argv[])
   cout << grid->GetNumberOfCells() << " cells "
     << grid->GetNumberOfPoints() << " pts "<< endl;
 
+ vtkNew<vtkRGridSlice> slice;
+  slice->SetInputData(grid.GetPointer());
+  slice->Update();
+
+  slice->GetOutput()->PrintSelf(cout, vtkIndent());
+  vtkRGrid* sl = slice->GetOutput();
+
   vtkNew<vtkDataSetSurfaceFilter> surface;
   surface->SetInputData(grid.GetPointer());
   surface->Update();
+
+  vtkNew<vtkDataSetSurfaceFilter> slsurface;
+  slsurface->SetInputData(sl);
+  slsurface->Update();
 
   vtkPolyData *pd = surface->GetOutput();
 
@@ -152,6 +164,7 @@ int TestRGridGeometryFilter(int argc, char* argv[])
   renWin->AddRenderer(renderer.GetPointer());
   vtkNew<vtkRenderWindowInteractor> iren;
   iren->SetRenderWindow(renWin.GetPointer());
+
 
   vtkNew<vtkPolyDataMapper> mapper;
   mapper->SetInputConnection(0, surface->GetOutputPort(0));
@@ -170,6 +183,28 @@ int TestRGridGeometryFilter(int argc, char* argv[])
   wactor->GetProperty()->SetColor(0, 0, 0);
   wactor->GetProperty()->SetRepresentationToWireframe();
   renderer->AddActor(wactor.GetPointer());
+
+
+  vtkNew<vtkPolyDataMapper> slmapper;
+  slmapper->SetInputConnection(0, slsurface->GetOutputPort(0));
+  slmapper->SetScalarRange(0, sk);
+
+  vtkNew<vtkActor> slactor;
+  slactor->SetMapper(slmapper.GetPointer());
+  slactor->SetPosition(0,0,25);
+  renderer->AddActor(slactor.GetPointer());
+
+  vtkNew<vtkPolyDataMapper> slwmapper;
+  slwmapper->SetInputConnection(0, slsurface->GetOutputPort(0));
+  slwmapper->ScalarVisibilityOff();
+
+  vtkNew<vtkActor> slwactor;
+  slwactor->SetMapper(slwmapper.GetPointer());
+  slwactor->SetPosition(0,0,25);
+  slwactor->GetProperty()->SetColor(0, 0, 0);
+  slwactor->GetProperty()->SetRepresentationToWireframe();
+  renderer->AddActor(slwactor.GetPointer());
+
 
   // Standard testing code.
   //renWin->SetMultiSamples(0);
