@@ -39,9 +39,14 @@ public:
   vtkTypeMacro(vtkRGridSlice, vtkRGridAlgorithm);
   void PrintSelf(ostream&, vtkIndent);
 
+  vtkGetVector6Macro(SliceExtents, int);
+  vtkSetVector6Macro(SliceExtents, int);
+
 protected:
   vtkRGridSlice();
   ~vtkRGridSlice();
+
+  int SliceExtents[6];
 
   virtual int RequestData(vtkInformation*, vtkInformationVector**, vtkInformationVector*);
   virtual int FillInputPortInformation(int, vtkInformation*);

@@ -32,6 +32,12 @@ vtkStandardNewMacro(vtkRGridSlice);
 //-----------------------------------------------------------------------------
 vtkRGridSlice::vtkRGridSlice()
 {
+  this->SliceExtents[0] = 0;
+  this->SliceExtents[1] = 0;
+  this->SliceExtents[2] = 0;
+  this->SliceExtents[3] = VTK_INT_MAX;
+  this->SliceExtents[4] = 0;
+  this->SliceExtents[5] = VTK_INT_MAX;
 }
 
 //-----------------------------------------------------------------------------
@@ -68,22 +74,29 @@ int vtkRGridSlice::RequestData(vtkInformation*,
   int dims[3];
   input->GetDimensions(dims);
 
+  int mini = std::max(0, std::min(this->SliceExtents[0], dims[0]));
+  int maxi = std::max(0, std::min(this->SliceExtents[1], dims[0]));
+
+  int minj = std::max(0, std::min(this->SliceExtents[2], dims[1]));
+  int maxj = std::max(0, std::min(this->SliceExtents[3], dims[1]));
+
+  int mink = std::max(0, std::min(this->SliceExtents[4], dims[2]));
+  int maxk = std::max(0, std::min(this->SliceExtents[5], dims[2]));
+
   // Initialize output cell data
-  vtkDataSetAttributes* inData = static_cast<vtkDataSetAttributes*>(input->GetCellData());
-  vtkDataSetAttributes* outData = static_cast<vtkDataSetAttributes*>(output->GetCellData());
-  outData->CopyAllocate(inData);
-
-
-  int mini = dims[0] / 2;
-  int maxi = mini+1;
+  vtkDataSetAttributes* inCellData =
+    static_cast<vtkDataSetAttributes*>(input->GetCellData());
+  vtkDataSetAttributes* outCellData =
+    static_cast<vtkDataSetAttributes*>(output->GetCellData());
+  outCellData->CopyAllocate(inCellData);
 
   output->SetPoints(input->GetPoints());
-  output->SetDimensions(maxi - mini, dims[1], dims[2]);
+  output->SetDimensions(maxi - mini, maxj - minj, maxk - mink);
   vtkNew<vtkCellArray> cells;
-  cells->Allocate((maxi - mini) * dims[1] * dims[2] * 9);
-  for (int k = 0; k < dims[2]; k++)
+  cells->Allocate((maxi - mini) * (maxj - minj) * (maxk - mink) * 9);
+  for (int k = mink; k < maxk; k++)
     {
-    for (int j = 0; j < dims[1]; j++)
+    for (int j = minj; j < maxj; j++)
       {
       for (int i = mini; i < maxi; i++)
         {
@@ -91,7 +104,7 @@ int vtkRGridSlice::RequestData(vtkInformation*,
         vtkNew<vtkIdList> ptIds;
         input->GetCellPoints(cellId, ptIds.GetPointer());
         vtkIdType nCellId = cells->InsertNextCell(ptIds.GetPointer());
-        outData->CopyData(inData, cellId, nCellId);
+        outCellData->CopyData(inCellData, cellId, nCellId);
         }
       }
     }

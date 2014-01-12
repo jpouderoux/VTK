@@ -39,6 +39,69 @@
 #include "vtkCell.h"
 #include "vtkNew.h"
 #include "vtkOutlineCornerFilter.h"
+#include "vtkInteractorStyleTrackballCamera.h"
+#include "vtkObjectFactory.h"
+
+vtkNew<vtkRenderer> renderer;
+vtkNew<vtkRenderWindow> renWin;
+vtkNew<vtkRGridSlice> slice;
+
+//-----------------------------------------------------------------------------
+class MytInteractorStyle : public vtkInteractorStyleTrackballCamera
+{
+public:
+  static MytInteractorStyle* New();
+  vtkTypeMacro(MytInteractorStyle, vtkInteractorStyleTrackballCamera);
+
+  MytInteractorStyle()
+  {
+  }
+
+  virtual void OnKeyPress()
+  {
+    vtkRenderWindowInteractor* rwi = this->GetInteractor();
+    std::string key = rwi->GetKeySym();
+    char keyCode = rwi->GetKeyCode();
+    std::string keyname = rwi->GetKeySym();
+    int extents[6];
+    slice->GetSliceExtents(extents);
+    if (keyname == "Left")
+      {
+      extents[0] -= 1;
+      extents[1] = extents[0] + 2;
+      }
+    else if (keyname == "Right")
+      {
+      extents[0] += 1;
+      extents[1] = extents[0] + 2;
+      }
+    else if (keyname == "Up")
+      {
+      extents[0] = 0;
+      extents[1] = VTK_INT_MAX;
+      extents[4] += 1;
+      extents[5] = extents[4] + 1;
+      }
+    else if (keyname == "Down")
+      {
+      extents[0] = 0;
+      extents[1] = VTK_INT_MAX;
+      extents[4] -= 1;
+      extents[5] = extents[4] + 1;
+      }
+    else switch (keyCode)
+      {
+      default:break;
+      }
+
+    slice->SetSliceExtents(extents);
+    slice->Update();
+    renWin->Render();
+  }
+
+};
+
+vtkStandardNewMacro(MytInteractorStyle);
 
 int TestRGridGeometryFilter(int argc, char* argv[])
 {
@@ -134,7 +197,6 @@ int TestRGridGeometryFilter(int argc, char* argv[])
   cout << grid->GetNumberOfCells() << " cells "
     << grid->GetNumberOfPoints() << " pts "<< endl;
 
- vtkNew<vtkRGridSlice> slice;
   slice->SetInputData(grid.GetPointer());
   slice->Update();
 
@@ -146,21 +208,13 @@ int TestRGridGeometryFilter(int argc, char* argv[])
   surface->Update();
 
   vtkNew<vtkDataSetSurfaceFilter> slsurface;
-  slsurface->SetInputData(sl);
+  slsurface->SetInputConnection(slice->GetOutputPort(0));
   slsurface->Update();
-
-  vtkPolyData *pd = surface->GetOutput();
-
-  //pd->PrintSelf(cout, vtkIndent());
-  cout << pd->GetNumberOfCells() << " cells "
-    << pd->GetNumberOfPoints() << " pts "<< endl;
 
   vtkNew<vtkOutlineCornerFilter> outline;
   outline->SetInputData(grid.GetPointer());
 
   // Standard rendering classes
-  vtkNew<vtkRenderer> renderer;
-  vtkNew<vtkRenderWindow> renWin;
   renWin->AddRenderer(renderer.GetPointer());
   vtkNew<vtkRenderWindowInteractor> iren;
   iren->SetRenderWindow(renWin.GetPointer());
@@ -211,11 +265,17 @@ int TestRGridGeometryFilter(int argc, char* argv[])
   renderer->SetBackground(0.5, 0.5, 0.5);
   renWin->SetSize(900, 900);
   renWin->Render();
-  int retVal = vtkRegressionTestImage(renWin.GetPointer());
+
+  vtkNew<MytInteractorStyle> style;
+  iren->SetInteractorStyle(style.GetPointer());
+  iren->SetRenderWindow(renWin.GetPointer());
+  iren->Initialize();
+  iren->Start();
+  //int retVal = vtkRegressionTestImage(renWin.GetPointer());
  // if ( retVal == vtkRegressionTester::DO_INTERACTOR)
     {
-    iren->Start();
+   // iren->Start();
     }
 
-  return !retVal;
+  return EXIT_SUCCESS; //!retVal;
 }
