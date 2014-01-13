@@ -650,7 +650,6 @@ void vtkRGrid::Crop(const int* updateExtent)
     cells->Allocate(outSize * 9);
 
     // Traverse input data and copy cell attributes to output
-    vtkIdType newId = 0;
     int inInc1 = (extent[1] - extent[0]);
     int inInc2 = inInc1 * (extent[3] - extent[2]);
     for (int k = uExt[4]; k < uExt[5]; ++k)
@@ -665,7 +664,7 @@ void vtkRGrid::Crop(const int* updateExtent)
           vtkNew<vtkIdList> ptIds;
           this->GetCellPoints(idx, ptIds.GetPointer());
           vtkIdType nCellId = cells->InsertNextCell(ptIds.GetPointer());
-          outCD->CopyData(inCD, idx, newId++);
+          outCD->CopyData(inCD, idx, nCellId);
           }
         }
       }

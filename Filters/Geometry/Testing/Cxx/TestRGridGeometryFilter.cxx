@@ -25,6 +25,7 @@
 #include "vtkLookupTable.h"
 #include "vtkPolyData.h"
 #include "vtkDataSetSurfaceFilter.h"
+#include "vtkFloatArray.h"
 #include "vtkGeometryFilter.h"
 #include "vtkPolyDataMapper.h"
 #include "vtkCamera.h"
@@ -39,6 +40,8 @@
 #include "vtkOutlineCornerFilter.h"
 #include "vtkInteractorStyleTrackballCamera.h"
 #include "vtkObjectFactory.h"
+#include "vtkUnstructuredGrid.h"
+#include "vtkXMLUnstructuredGridReader.h"
 
 vtkNew<vtkRenderer> renderer;
 vtkNew<vtkRenderWindow> renWin;
@@ -101,7 +104,7 @@ public:
 
 vtkStandardNewMacro(MytInteractorStyle);
 
-int TestRGridGeometryFilter(int argc, char* argv[])
+int main(int argc, char* argv[])
 {
   vtkNew<vtkPoints> pts;
   const int si = 60;
@@ -209,16 +212,74 @@ int TestRGridGeometryFilter(int argc, char* argv[])
   slice->SetInputData(grid.GetPointer());
   slice->Update();
 
+
+  vtkNew<vtkXMLUnstructuredGridReader> reader;
+  reader->SetFileName("c:/BRILLIG_FAULT.vtu");
+  reader->Update();
+  vtkUnstructuredGrid* ug = reader->GetOutput();
+
+  vtkNew<vtkRGrid> grid2;
+  grid2->SetPoints(ug->GetPoints());
+  vtkIntArray* ijk =
+    vtkIntArray::SafeDownCast(ug->GetCellData()->GetArray("IJK"));
+  vtkCellArray* ugcells = ug->GetCells();
+  ugcells->InitTraversal();
+
+  vtkIdType npts, *apts, cid = 0;
+  int dims[3] = { 0, 0, 0 };
+  while(ugcells->GetNextCell(npts, apts))
+    {
+    double* ijk_ = ijk->GetTuple3(cid);
+    if (dims[0] < ijk_[0]) dims[0] = ijk_[0];
+    if (dims[1] < ijk_[1]) dims[1] = ijk_[1];
+    if (dims[2] < ijk_[2]) dims[2] = ijk_[2];
+
+    cid++;
+    }
+  dims[0]++; dims[1]++; dims[2]++;
+
+  vtkNew<vtkUnsignedCharArray> blanking2;
+  blanking2->SetName("blanking");
+  vtkIdType len = ijk->GetNumberOfTuples();
+  blanking2->SetNumberOfValues(len); //dims[0] * dims[1] * dims[2]);
+  vtkFloatArray* por = vtkFloatArray::SafeDownCast(ug->GetCellData()->GetArray("PORV"));
+  double porrange[2] = { VTK_DOUBLE_MAX, VTK_DOUBLE_MIN };
+  for (int i = 0; i < len; i++)
+    {
+    double v = por->GetValue(i);
+    if (v != 0. && v < porrange[0]) porrange[0] = v;
+    if (v != 0. && v > porrange[1]) porrange[1] = v;
+    blanking2->SetValue(i, (v != 0.) ? 1 : 0);
+    }
+
+  grid2->SetDimensions(dims[0], dims[1], dims[2]);
+  grid2->SetCells(ugcells);
+  grid2->GetCellData()->ShallowCopy(ug->GetCellData());
+  grid2->GetPointData()->ShallowCopy(ug->GetPointData());
+  grid2->GetCellData()->AddArray(blanking2.GetPointer());
+  grid2->SetCellVisibilityArray(blanking2.GetPointer());
+  grid2->GetCellData()->SetActiveScalars("PORV");
+
+  vtkIdType nn, *np;
+  grid2->GetCellPoints(1, nn, np);
+  for (int i = 0; i < nn; i++)
+    {
+    cout << i << ": " << np[i] << endl;
+    }
+  grid2->GetCellPoints(2, nn, np);
+  for (int i = 0; i < nn; i++)
+    {
+    cout << i << ": " << np[i] << endl;
+    }
+
   vtkNew<vtkDataSetSurfaceFilter> surface;
-  surface->SetInputData(grid.GetPointer());
+  surface->SetInputData(grid2.GetPointer());
   surface->Update();
 
   vtkNew<vtkDataSetSurfaceFilter> slsurface;
   slsurface->SetInputConnection(slice->GetOutputPort(0));
   slsurface->Update();
 
-  //vtkNew<vtkOutlineCornerFilter> outline;
-  //outline->SetInputData(grid.GetPointer());
 
   // Rendering pipeline
   renWin->AddRenderer(renderer.GetPointer());
@@ -227,7 +288,7 @@ int TestRGridGeometryFilter(int argc, char* argv[])
 
   vtkNew<vtkPolyDataMapper> mapper;
   mapper->SetInputConnection(0, surface->GetOutputPort(0));
-  mapper->SetScalarRange(0, sk);
+  mapper->SetScalarRange(porrange); //0, sk);
 
   vtkNew<vtkActor> actor;
   actor->SetMapper(mapper.GetPointer());
@@ -246,7 +307,8 @@ int TestRGridGeometryFilter(int argc, char* argv[])
 
   vtkNew<vtkPolyDataMapper> slmapper;
   slmapper->SetInputConnection(0, slsurface->GetOutputPort(0));
-  slmapper->SetScalarRange(0, sk);
+  slmapper->SetScalarRange(porrange);//0, sk);
+  cout <<  porrange[0] << " to " << porrange[1] <<endl;
 
   vtkNew<vtkActor> slactor;
   slactor->SetMapper(slmapper.GetPointer());

@@ -2,7 +2,6 @@ vtk_add_test_cxx(
   TestExtractSurfaceNonLinearSubdivision.cxx
   TestImageDataToUniformGrid.cxx,NO_VALID
   TestProjectSphereFilter.cxx,NO_VALID
-  TestRGridGeometryFilter.cxx,NO_VALID
   TestStructuredAMRNeighbor.cxx,NO_VALID
   TestUniformGridGhostDataGenerator.cxx,NO_VALID
   TestUnstructuredGridGeometryFilter.cxx
@@ -14,11 +13,12 @@ set(MyTests
   TestStructuredAMRGridConnectivity.cxx
   TestStructuredGridConnectivity.cxx
   TestStructuredGridGhostDataGenerator.cxx
+  TestRGridGeometryFilter.cxx
   )
 
 foreach(test ${MyTests})
   get_filename_component(TName ${test} NAME_WE)
   add_executable(${TName} ${test})
-  target_link_libraries(${TName} vtkFiltersGeometry vtkIOXML)
+  target_link_libraries(${TName} vtkFiltersGeometry vtkIOXML vtkIOLegacy vtkRenderingOpenGL vtkRenderingFreeTypeOpenGL vtkInteractionStyle})
   add_test(NAME ${vtk-module}Cxx-${TName} COMMAND ${TName})
 endforeach()
