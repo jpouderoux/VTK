@@ -44,10 +44,13 @@
 
 #include "vtkRGrid.h" // Needed for inline methods
 
-class vtkEmptyCell;
+class vtkBitArray;
 class vtkCellArray;
 class vtkCellLinks;
+class vtkCharArray;
+class vtkEmptyCell;
 class vtkHexahedron;
+class vtkStructuredVisibilityConstraint;
 class vtkUnsignedCharArray;
 
 class VTKCOMMONDATAMODEL_EXPORT vtkRGrid : public vtkPointSet
@@ -154,6 +157,38 @@ public:
   static vtkRGrid* GetData(vtkInformationVector* v, int i=0);
   //ETX
 
+  vtkGetObjectMacro(FacesConnectivityMaskArray, vtkUnsignedCharArray);
+  void SetFacesConnectivityMaskArray(vtkUnsignedCharArray*);
+
+  // Description:
+  // Set an array that defines the (blanking) visibility of the cells
+  // in the grid. Make sure that length of the visibility array matches
+  // the number of cells in the grid.
+  void SetCellVisibilityArray(vtkUnsignedCharArray *cellVisibility);
+
+  // Description:
+  // Get the array that defines the blanking (visibility) of each cell.
+  vtkUnsignedCharArray *GetCellVisibilityArray();
+
+  // Description:
+  // Methods for supporting blanking of cells. Blanking turns on or off
+  // cells in the structured grid, and hence the cells connected to them.
+  // These methods should be called only after the dimensions of the
+  // grid are set.
+  void BlankCell(vtkIdType cellId);
+  void UnBlankCell(vtkIdType cellId);
+
+  // Description:
+  // Return non-zero value if specified cell is visible.
+  // These methods should be called only after the dimensions of the
+  // grid are set.
+  unsigned char IsCellVisible(vtkIdType cellId);
+
+  // Description:
+  // Returns 1 if there is any visibility constraint on the cells,
+  // 0 otherwise.
+  unsigned char GetCellBlanking();
+
 protected:
   vtkRGrid();
   ~vtkRGrid();
@@ -176,6 +211,13 @@ protected:
 
   vtkCellArray* Cells;
   vtkCellLinks* Links;
+
+  vtkUnsignedCharArray* FacesConnectivityMaskArray;
+
+  vtkStructuredVisibilityConstraint* CellVisibility;
+
+  void SetCellVisibility(vtkStructuredVisibilityConstraint *cellVisibility);
+  vtkGetObjectMacro(CellVisibility, vtkStructuredVisibilityConstraint);
 
 private:
   // Internal method used by DeepCopy and ShallowCopy.

@@ -24,19 +24,24 @@
 #include "vtkInformationVector.h"
 #include "vtkLine.h"
 #include "vtkMath.h"
+#include "vtkNew.h"
 #include "vtkObjectFactory.h"
 #include "vtkPointData.h"
 #include "vtkQuad.h"
 #include "vtkStructuredData.h"
+#include "vtkStructuredVisibilityConstraint.h"
 #include "vtkVertex.h"
 
 vtkStandardNewMacro(vtkRGrid);
+
+vtkSetObjectImplementationMacro(vtkRGrid, FacesConnectivityMaskArray, vtkUnsignedCharArray);
 
 #define vtkAdjustBoundsMacro(A, B) \
   A[0] = (B[0] < A[0] ? B[0] : A[0]);   A[1] = (B[0] > A[1] ? B[0] : A[1]); \
   A[2] = (B[1] < A[2] ? B[1] : A[2]);   A[3] = (B[1] > A[3] ? B[1] : A[3]); \
   A[4] = (B[2] < A[4] ? B[2] : A[4]);   A[5] = (B[2] > A[5] ? B[2] : A[5])
 
+//----------------------------------------------------------------------------
 vtkRGrid::vtkRGrid()
 {
   this->Hexahedron = vtkHexahedron::New();
@@ -48,6 +53,9 @@ vtkRGrid::vtkRGrid()
   this->Dimensions[0] = 0;
   this->Dimensions[1] = 0;
   this->Dimensions[2] = 0;
+
+  this->FacesConnectivityMaskArray = 0;
+  this->CellVisibility = vtkStructuredVisibilityConstraint::New();
 
   int extent[6] = { 0, -1, 0, -1, 0, -1 };
   memcpy(this->Extent, extent, 6 * sizeof(int));
@@ -61,6 +69,11 @@ vtkRGrid::~vtkRGrid()
 {
   this->Hexahedron->Delete();
   this->EmptyCell->Delete();
+  this->CellVisibility->Delete();
+  if (this->FacesConnectivityMaskArray)
+    {
+    this->FacesConnectivityMaskArray->UnRegister(this);
+    }
 }
 
 //----------------------------------------------------------------------------
@@ -143,25 +156,16 @@ void vtkRGrid::GetCell(vtkIdType cellId, vtkCell *cell)
   // Update dimensions
   this->GetDimensions();
 
-  vtkIdType *indices = this->GetCellPoints(cellId);
-  cell->PointIds->SetId(0, indices[0]);
-  cell->PointIds->SetId(1, indices[1]);
-  cell->PointIds->SetId(2, indices[2]);
-  cell->PointIds->SetId(3, indices[3]);
-  cell->PointIds->SetId(4, indices[4]);
-  cell->PointIds->SetId(5, indices[5]);
-  cell->PointIds->SetId(6, indices[6]);
-  cell->PointIds->SetId(7, indices[7]);
-
   // Extract point coordinates and point ids. NOTE: the ordering of the
   // vtkHexahedron cells are tricky.
-  int NumberOfIds = cell->PointIds->GetNumberOfIds();
-  for (int i = 0; i < NumberOfIds; i++)
+  vtkIdType *indices = this->GetCellPoints(cellId);
+  for (int i = 0; i < 8; i++)
     {
+    vtkIdType idx = indices[i];
     double x[3];
-    vtkIdType idx = cell->PointIds->GetId(i);
     this->Points->GetPoint(idx, x);
     cell->Points->SetPoint(i, x);
+    cell->PointIds->SetId(i, idx);
     }
 }
 
@@ -428,21 +432,6 @@ unsigned long vtkRGrid::GetActualMemorySize()
 }
 
 //----------------------------------------------------------------------------
-void vtkRGrid::ShallowCopy(vtkDataObject *dataObject)
-{
-  vtkRGrid *grid = vtkRGrid::SafeDownCast(dataObject);
-
-  if (grid)
-    {
-    this->InternalRGridCopy(grid);
-    }
-
-
-  // Do superclass
-  this->vtkPointSet::ShallowCopy(dataObject);
-}
-
-//----------------------------------------------------------------------------
 void vtkRGrid::SetCells(vtkCellArray *cells)
 {
   if (this->Cells == cells)
@@ -463,6 +452,21 @@ void vtkRGrid::SetCells(vtkCellArray *cells)
 }
 
 //----------------------------------------------------------------------------
+void vtkRGrid::ShallowCopy(vtkDataObject *dataObject)
+{
+  vtkRGrid *grid = vtkRGrid::SafeDownCast(dataObject);
+
+  if (grid)
+    {
+    this->InternalRGridCopy(grid);
+    this->CellVisibility->ShallowCopy(grid->CellVisibility);
+    }
+
+  // Do superclass
+  this->vtkPointSet::ShallowCopy(dataObject);
+}
+
+//----------------------------------------------------------------------------
 void vtkRGrid::DeepCopy(vtkDataObject *dataObject)
 {
   vtkRGrid* grid = vtkRGrid::SafeDownCast(dataObject);
@@ -470,6 +474,7 @@ void vtkRGrid::DeepCopy(vtkDataObject *dataObject)
   if (grid)
     {
     this->InternalRGridCopy(grid);
+    this->CellVisibility->DeepCopy(grid->CellVisibility);
     }
 
   // Do superclass
@@ -544,15 +549,63 @@ void vtkRGrid::ComputeScalarRange()
 }
 
 //----------------------------------------------------------------------------
+// Turn off a particular data cell.
+void vtkRGrid::BlankCell(vtkIdType cellId)
+{
+  int celldims[3];
+  this->GetCellDims(celldims);
+  this->CellVisibility->Initialize(celldims);
+  this->CellVisibility->Blank(cellId);
+}
+
+//----------------------------------------------------------------------------
+// Turn on a particular data cell.
+void vtkRGrid::UnBlankCell(vtkIdType cellId)
+{
+  int celldims[3];
+  this->GetCellDims(celldims);
+  this->CellVisibility->Initialize(celldims);
+  this->CellVisibility->UnBlank(cellId);
+}
+
+//----------------------------------------------------------------------------
+void vtkRGrid::SetCellVisibilityArray(vtkUnsignedCharArray *cellVis)
+{
+  this->CellVisibility->SetVisibilityById(cellVis);
+}
+
+//----------------------------------------------------------------------------
+vtkUnsignedCharArray* vtkRGrid::GetCellVisibilityArray()
+{
+  int celldims[3];
+  this->GetCellDims(celldims);
+  this->CellVisibility->Initialize(celldims);
+  this->CellVisibility->Allocate();
+  return this->CellVisibility->GetVisibilityById();
+}
+
+//----------------------------------------------------------------------------
+// Return non-zero if the specified cell is visible (i.e., not blanked)
+unsigned char vtkRGrid::IsCellVisible(vtkIdType cellId)
+{
+  return this->CellVisibility->IsVisible(cellId);
+}
+
+//----------------------------------------------------------------------------
+unsigned char vtkRGrid::GetCellBlanking()
+{
+  return this->CellVisibility->IsConstrained();
+}
+
+//----------------------------------------------------------------------------
 void vtkRGrid::Crop(const int* updateExtent)
 {
-  int i, j, k;
   int uExt[6];
   const int* extent = this->Extent;
 
   // If the update extent is larger than the extent,
   // we cannot do anything about it here.
-  for (i = 0; i < 3; ++i)
+  for (int i = 0; i < 3; ++i)
     {
     uExt[i*2] = updateExtent[i*2];
     if (uExt[i*2] < extent[i*2])
@@ -575,82 +628,50 @@ void vtkRGrid::Crop(const int* updateExtent)
     }
   else
     {
-    vtkRGrid *newGrid;
-    vtkPointData *inPD, *outPD;
-    vtkCellData *inCD, *outCD;
-    int outSize, jOffset, kOffset;
-    vtkIdType idx, newId;
-    vtkPoints *newPts, *inPts;
-    int inInc1, inInc2;
-
     // Get the points.  Protect against empty data objects.
-    inPts = this->GetPoints();
-    if (inPts == NULL)
+    vtkPoints *inPts = this->GetPoints();
+    if (!inPts)
       {
       return;
       }
 
-    vtkDebugMacro(<< "Cropping Grid");
+    vtkDebugMacro(<< "Cropping RGrid");
 
-    newGrid = vtkRGrid::New();
-    inPD  = this->GetPointData();
-    inCD  = this->GetCellData();
-    outPD = newGrid->GetPointData();
-    outCD = newGrid->GetCellData();
+    vtkCellData*  inCD  = this->GetCellData();
+    vtkNew<vtkCellData> outCD;
 
     // Allocate necessary objects
-    //
-    newGrid->SetExtent(uExt);
-    outSize = (uExt[1]-uExt[0]+1)*(uExt[3]-uExt[2]+1)*(uExt[5]-uExt[4]+1);
-    newPts = inPts->NewInstance();
-    newPts->SetDataType(inPts->GetDataType());
-    newPts->SetNumberOfPoints(outSize);
-    outPD->CopyAllocate(inPD,outSize,outSize);
-    outCD->CopyAllocate(inCD,outSize,outSize);
+    int outSize = (uExt[1] - uExt[0] + 1) *
+      (uExt[3] - uExt[2] + 1) *
+      (uExt[5] - uExt[4] + 1);
+    outCD->CopyAllocate(inCD, outSize, outSize);
 
-    // Traverse this data and copy point attributes to output
-    newId = 0;
-    inInc1 = (extent[1]-extent[0]+1);
-    inInc2 = inInc1*(extent[3]-extent[2]+1);
-    for (k=uExt[4]; k <= uExt[5]; ++k)
-      {
-      kOffset = (k - extent[4]) * inInc2;
-      for (j=uExt[2]; j <= uExt[3]; ++j)
-        {
-        jOffset = (j - extent[2]) * inInc1;
-        for (i=uExt[0]; i <= uExt[1]; ++i)
-          {
-          idx = (i - extent[0]) + jOffset + kOffset;
-          newPts->SetPoint(newId,inPts->GetPoint(idx));
-          outPD->CopyData(inPD, idx, newId++);
-          }
-        }
-      }
+    vtkNew<vtkCellArray> cells;
+    cells->Allocate(outSize * 9);
 
     // Traverse input data and copy cell attributes to output
-    newId = 0;
-    inInc1 = (extent[1] - extent[0]);
-    inInc2 = inInc1*(extent[3] - extent[2]);
-    for (k=uExt[4]; k < uExt[5]; ++k)
+    vtkIdType newId = 0;
+    int inInc1 = (extent[1] - extent[0]);
+    int inInc2 = inInc1 * (extent[3] - extent[2]);
+    for (int k = uExt[4]; k < uExt[5]; ++k)
       {
-      kOffset = (k - extent[4]) * inInc2;
-      for (j=uExt[2]; j < uExt[3]; ++j)
+      int kOffset = (k - extent[4]) * inInc2;
+      for (int j = uExt[2]; j < uExt[3]; ++j)
         {
-        jOffset = (j - extent[2]) * inInc1;
-        for (i=uExt[0]; i < uExt[1]; ++i)
+        int jOffset = (j - extent[2]) * inInc1;
+        for (int i = uExt[0]; i < uExt[1]; ++i)
           {
-          idx = (i - extent[0]) + jOffset + kOffset;
+          int idx = (i - extent[0]) + jOffset + kOffset;
+          vtkNew<vtkIdList> ptIds;
+          this->GetCellPoints(idx, ptIds.GetPointer());
+          vtkIdType nCellId = cells->InsertNextCell(ptIds.GetPointer());
           outCD->CopyData(inCD, idx, newId++);
           }
         }
       }
 
     this->SetExtent(uExt);
-    this->SetPoints(newPts);
-    newPts->Delete();
-    inPD->ShallowCopy(outPD);
-    inCD->ShallowCopy(outCD);
-    newGrid->Delete();
+    inCD->ShallowCopy(outCD.GetPointer());
     }
 }
 
@@ -666,10 +687,10 @@ void vtkRGrid::PrintSelf(ostream& os, vtkIndent indent)
                                   << dim[2] << ")\n";
 
   const int* extent = this->Extent;
-  os << indent << "Extent: " << extent[0] << ", "
-     << extent[1] << ", " << extent[2] << ", "
-     << extent[3] << ", " << extent[4] << ", "
-     << extent[5] << endl;
+  os << indent << "Extent: "
+    << extent[0] << ", " << extent[1] << ", "
+    << extent[2] << ", " << extent[3] << ", "
+    << extent[4] << ", " << extent[5] << endl;
 
   os << ")\n";
 }

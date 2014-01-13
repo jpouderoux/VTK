@@ -30,6 +30,7 @@
 #include "vtkPolyData.h"
 #include "vtkPyramid.h"
 #include "vtkRectilinearGrid.h"
+#include "vtkRGrid.h"
 #include "vtkSmartPointer.h"
 #include "vtkStreamingDemandDrivenPipeline.h"
 #include "vtkStructuredGridGeometryFilter.h"
@@ -1086,6 +1087,12 @@ int vtkDataSetSurfaceFilter::DataSetExecute(vtkDataSet *input,
   vtkStructuredGrid *sgridInput = vtkStructuredGrid::SafeDownCast(input);
   bool mayBlank = sgridInput && sgridInput->GetCellBlanking();
 
+  vtkRGrid* rgridInput = vtkRGrid::SafeDownCast(input);
+  if (rgridInput)
+    {
+    mayBlank = rgridInput->GetCellBlanking() == 1;
+    }
+
   cellIds = vtkIdList::New();
   pts = vtkIdList::New();
 
@@ -1121,7 +1128,8 @@ int vtkDataSetSurfaceFilter::DataSetExecute(vtkDataSet *input,
       }
 
     input->GetCell(cellId,cell);
-    if (mayBlank && !sgridInput->IsCellVisible(cellId))
+    if (mayBlank && ((sgridInput && !sgridInput->IsCellVisible(cellId)) ||
+      (rgridInput && !rgridInput->IsCellVisible(cellId))))
       {
       continue;
       }
@@ -1157,7 +1165,8 @@ int vtkDataSetSurfaceFilter::DataSetExecute(vtkDataSet *input,
             noNeighbors = true;
             for (vtkIdType ci = 0; ci < cellIds->GetNumberOfIds(); ci++)
               {
-              if (sgridInput->IsCellVisible(cellIds->GetId(ci)))
+              if ((sgridInput && sgridInput->IsCellVisible(cellIds->GetId(ci))) ||
+                (rgridInput && rgridInput->IsCellVisible(cellIds->GetId(ci))))
                 {
                 noNeighbors = false;
                 break;

@@ -83,6 +83,16 @@ int vtkRGridSlice::RequestData(vtkInformation*,
   int mink = std::max(0, std::min(this->SliceExtents[4], dims[2]));
   int maxk = std::max(0, std::min(this->SliceExtents[5], dims[2]));
 
+  // Copy input point data to output
+  vtkDataSetAttributes* inPointData =
+    static_cast<vtkDataSetAttributes*>(input->GetCellData());
+  vtkDataSetAttributes* outPointData =
+    static_cast<vtkDataSetAttributes*>(output->GetCellData());
+  if (outPointData && inPointData)
+    {
+    outPointData->DeepCopy(inPointData);
+    }
+
   // Initialize output cell data
   vtkDataSetAttributes* inCellData =
     static_cast<vtkDataSetAttributes*>(input->GetCellData());
@@ -92,6 +102,7 @@ int vtkRGridSlice::RequestData(vtkInformation*,
 
   output->SetPoints(input->GetPoints());
   output->SetDimensions(maxi - mini, maxj - minj, maxk - mink);
+
   vtkNew<vtkCellArray> cells;
   cells->Allocate((maxi - mini) * (maxj - minj) * (maxk - mink) * 9);
   for (int k = mink; k < maxk; k++)
@@ -109,6 +120,13 @@ int vtkRGridSlice::RequestData(vtkInformation*,
       }
     }
   output->SetCells(cells.GetPointer());
+
+  vtkUnsignedCharArray* vis = input->GetCellVisibilityArray();
+  if (vis)
+    {
+    output->SetCellVisibilityArray(vtkUnsignedCharArray::SafeDownCast(
+      output->GetCellData()->GetArray(vis->GetName())));
+    }
 
   this->UpdateProgress(1.);
 

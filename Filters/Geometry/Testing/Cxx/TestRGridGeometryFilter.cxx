@@ -22,10 +22,8 @@
 #include "vtkRenderer.h"
 #include "vtkRenderWindow.h"
 #include "vtkRenderWindowInteractor.h"
-#include "vtkXMLUnstructuredGridReader.h"
 #include "vtkLookupTable.h"
 #include "vtkPolyData.h"
-#include "vtkUnstructuredGridGeometryFilter.h"
 #include "vtkDataSetSurfaceFilter.h"
 #include "vtkGeometryFilter.h"
 #include "vtkPolyDataMapper.h"
@@ -126,7 +124,7 @@ int TestRGridGeometryFilter(int argc, char* argv[])
         if (i > 30)
           {
           x -= 1;
-          z = k + 1.0;
+          z = k + (j*8. / 52.);//1.0;
           if (i > 50)
             {
             x -= 1;
@@ -146,6 +144,10 @@ int TestRGridGeometryFilter(int argc, char* argv[])
   vtkNew<vtkDoubleArray> scalars;
   scalars->SetName("scalars");
   scalars->SetNumberOfValues(si * sj * sk);
+
+  vtkNew<vtkUnsignedCharArray> blanking;
+  blanking->SetName("blanking");
+  blanking->SetNumberOfValues(si * sj * sk);
 
   vtkNew<vtkCellArray> cells;
   cells->Allocate(9 * si * sj * sk);
@@ -183,6 +185,11 @@ int TestRGridGeometryFilter(int argc, char* argv[])
           }
 
         scalars->SetValue(ijk, k);
+        bool visible = true;
+        if (i > 4 && i < 18 && j < 10 && k < 10)
+          visible = false;
+
+        blanking->SetValue(ijk, visible ? 1 : 0);
         }
       }
     }
@@ -191,17 +198,16 @@ int TestRGridGeometryFilter(int argc, char* argv[])
   grid->SetDimensions(si, sj, sk);
   grid->SetPoints(pts.GetPointer());
   grid->SetCells(cells.GetPointer());
+  grid->GetCellData()->AddArray(blanking.GetPointer());
   grid->GetCellData()->AddArray(scalars.GetPointer());
   grid->GetCellData()->SetActiveScalars("scalars");
+  grid->SetCellVisibilityArray(blanking.GetPointer());
 
   cout << grid->GetNumberOfCells() << " cells "
     << grid->GetNumberOfPoints() << " pts "<< endl;
 
   slice->SetInputData(grid.GetPointer());
   slice->Update();
-
-  slice->GetOutput()->PrintSelf(cout, vtkIndent());
-  vtkRGrid* sl = slice->GetOutput();
 
   vtkNew<vtkDataSetSurfaceFilter> surface;
   surface->SetInputData(grid.GetPointer());
@@ -211,14 +217,13 @@ int TestRGridGeometryFilter(int argc, char* argv[])
   slsurface->SetInputConnection(slice->GetOutputPort(0));
   slsurface->Update();
 
-  vtkNew<vtkOutlineCornerFilter> outline;
-  outline->SetInputData(grid.GetPointer());
+  //vtkNew<vtkOutlineCornerFilter> outline;
+  //outline->SetInputData(grid.GetPointer());
 
-  // Standard rendering classes
+  // Rendering pipeline
   renWin->AddRenderer(renderer.GetPointer());
   vtkNew<vtkRenderWindowInteractor> iren;
   iren->SetRenderWindow(renWin.GetPointer());
-
 
   vtkNew<vtkPolyDataMapper> mapper;
   mapper->SetInputConnection(0, surface->GetOutputPort(0));
