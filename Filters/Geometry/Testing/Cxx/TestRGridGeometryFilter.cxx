@@ -14,6 +14,7 @@
 =========================================================================*/
 
 #include "vtkActor.h"
+#include "vtkAxesActor.h"
 #include "vtkCellArray.h"
 #include "vtkCellData.h"
 #include "vtkDoubleArray.h"
@@ -39,13 +40,77 @@
 #include "vtkNew.h"
 #include "vtkOutlineCornerFilter.h"
 #include "vtkInteractorStyleTrackballCamera.h"
+//#include "vtkInteractorStyleTrackballCamera.h"
 #include "vtkObjectFactory.h"
 #include "vtkUnstructuredGrid.h"
 #include "vtkXMLUnstructuredGridReader.h"
+#include "vtkPointLocator.h"
+#include "vtkMergePoints.h"
+#include "vtkCleanPolyData.h"
+#include "vtkLODProp3D.h"
+#include "vtkDecimatePro.h"
+#include "vtkOutlineFilter.h"
+#include "vtkLODActor.h"
+#include "vtkTriangleFilter.h"
+#include "vtkStripper.h"
+#include "vtkQuadricClustering.h"
+#include "vtkQuadricLODActor.h"
 
 vtkNew<vtkRenderer> renderer;
 vtkNew<vtkRenderWindow> renWin;
 vtkNew<vtkRGridSlice> slice;
+
+//----------------------------------------------------------------------------
+void CleanUnstructuredGrid(vtkUnstructuredGrid *input)
+{
+  if (input->GetNumberOfCells() == 0)
+    {
+    return;
+    }
+
+  // First, create a new points array that eliminate duplicate points.
+  // Also create a mapping from the old point id to the new.
+  vtkNew<vtkPoints> newPts;
+  vtkIdType num = input->GetNumberOfPoints();
+  vtkIdType* ptMap = new vtkIdType[num];
+
+  vtkNew<vtkPointLocator> locator;
+  locator->InitPointInsertion(newPts.GetPointer(), input->GetBounds(), num);
+
+  for (vtkIdType id = 0; id < num; ++id)
+    {
+    double pt[3];
+    input->GetPoint(id, pt);
+    vtkIdType newId;
+    if (locator->InsertUniquePoint(pt, newId))
+      {
+      //output->GetPointData()->CopyData(input->GetPointData(), id, newId);
+      }
+    ptMap[id] = newId;
+    }
+  input->SetPoints(newPts.GetPointer());
+
+  // Now copy the cells.
+  vtkNew<vtkIdList> cellPoints;
+  num = input->GetNumberOfCells();
+  vtkNew<vtkCellArray> newCells;
+  newCells->Allocate(num * 9);
+  for (vtkIdType id = 0; id < num; ++id)
+    {
+    input->GetCellPoints(id, cellPoints.GetPointer());
+    for (int i = 0; i < cellPoints->GetNumberOfIds(); i++)
+      {
+      int cellPtId = cellPoints->GetId(i);
+      cellPoints->SetId(i, ptMap[cellPtId]);
+      }
+    newCells->InsertNextCell(cellPoints.GetPointer());
+    }
+
+  delete [] ptMap;
+
+  newCells->Squeeze();
+  input->SetCells(VTK_HEXAHEDRON, newCells.GetPointer());
+}
 
 //-----------------------------------------------------------------------------
 class MytInteractorStyle : public vtkInteractorStyleTrackballCamera
@@ -69,42 +134,57 @@ public:
     if (keyname == "Left")
       {
       extents[0] -= 1;
-      extents[1] = extents[0] + 2;
+      extents[1] = extents[0] + 1;
+      extents[2] = 0;
+      extents[3] = VTK_INT_MAX;
       }
     else if (keyname == "Right")
       {
       extents[0] += 1;
-      extents[1] = extents[0] + 2;
+      extents[1] = extents[0] + 1;
+      extents[2] = 0;
+      extents[3] = VTK_INT_MAX;
+      }
+    if (keyname == "Down")
+      {
+      extents[0] = 0;
+      extents[1] = VTK_INT_MAX;
+      extents[2] -= 1;
+      extents[3] = extents[2] + 1;
       }
     else if (keyname == "Up")
+      {
+      extents[0] = 0;
+      extents[1] = VTK_INT_MAX;
+      extents[2] += 1;
+      extents[3] = extents[2] + 1;
+      }
+    else if (keyname == "Prior")
       {
       extents[0] = 0;
       extents[1] = VTK_INT_MAX;
       extents[4] += 1;
       extents[5] = extents[4] + 1;
       }
-    else if (keyname == "Down")
+    else if (keyname == "Next")
       {
       extents[0] = 0;
       extents[1] = VTK_INT_MAX;
       extents[4] -= 1;
       extents[5] = extents[4] + 1;
       }
-    else switch (keyCode)
+    /*else switch (keyCode)
       {
       default:break;
-      }
+      }*/
 
     slice->SetSliceExtents(extents);
     slice->Update();
     renWin->Render();
   }
-
 };
 
-vtkStandardNewMacro(MytInteractorStyle);
-
-int main(int argc, char* argv[])
+void CreateGrid(vtkRGrid* grid)
 {
   vtkNew<vtkPoints> pts;
   const int si = 60;
@@ -197,7 +277,6 @@ int main(int argc, char* argv[])
       }
     }
 
-  vtkNew<vtkRGrid> grid;
   grid->SetDimensions(si, sj, sk);
   grid->SetPoints(pts.GetPointer());
   grid->SetCells(cells.GetPointer());
@@ -205,20 +284,17 @@ int main(int argc, char* argv[])
   grid->GetCellData()->AddArray(scalars.GetPointer());
   grid->GetCellData()->SetActiveScalars("scalars");
   grid->SetCellVisibilityArray(blanking.GetPointer());
+}
 
-  cout << grid->GetNumberOfCells() << " cells "
-    << grid->GetNumberOfPoints() << " pts "<< endl;
-
-  slice->SetInputData(grid.GetPointer());
-  slice->Update();
-
-
+void LoadGrid(vtkRGrid* grid2, const std::string& fname, double dataRange[2])
+{
   vtkNew<vtkXMLUnstructuredGridReader> reader;
-  reader->SetFileName("c:/BRILLIG_FAULT.vtu");
+  reader->SetFileName(fname.c_str());
   reader->Update();
   vtkUnstructuredGrid* ug = reader->GetOutput();
 
-  vtkNew<vtkRGrid> grid2;
+  CleanUnstructuredGrid(ug);
+
   grid2->SetPoints(ug->GetPoints());
   vtkIntArray* ijk =
     vtkIntArray::SafeDownCast(ug->GetCellData()->GetArray("IJK"));
@@ -243,12 +319,13 @@ int main(int argc, char* argv[])
   vtkIdType len = ijk->GetNumberOfTuples();
   blanking2->SetNumberOfValues(len); //dims[0] * dims[1] * dims[2]);
   vtkFloatArray* por = vtkFloatArray::SafeDownCast(ug->GetCellData()->GetArray("PORV"));
-  double porrange[2] = { VTK_DOUBLE_MAX, VTK_DOUBLE_MIN };
+  dataRange[0] = VTK_DOUBLE_MAX;
+  dataRange[1] = VTK_DOUBLE_MIN;
   for (int i = 0; i < len; i++)
     {
     double v = por->GetValue(i);
-    if (v != 0. && v < porrange[0]) porrange[0] = v;
-    if (v != 0. && v > porrange[1]) porrange[1] = v;
+    if (v != 0. && v < dataRange[0]) dataRange[0] = v;
+    if (v != 0. && v > dataRange[1]) dataRange[1] = v;
     blanking2->SetValue(i, (v != 0.) ? 1 : 0);
     }
 
@@ -259,60 +336,72 @@ int main(int argc, char* argv[])
   grid2->GetCellData()->AddArray(blanking2.GetPointer());
   grid2->SetCellVisibilityArray(blanking2.GetPointer());
   grid2->GetCellData()->SetActiveScalars("PORV");
+}
 
-  vtkIdType nn, *np;
-  grid2->GetCellPoints(1, nn, np);
-  for (int i = 0; i < nn; i++)
+vtkStandardNewMacro(MytInteractorStyle);
+
+int TestRGridGeometryFilter(int argc, char* argv[])
+{
+  double dataRange[2];
+  vtkNew<vtkRGrid> grid;
+  //CreateGrid(grid.GetPointer());
+  //LoadGrid(grid.GetPointer(), "c:/BRILLIG.bin.vtu", dataRange);
+  LoadGrid(grid.GetPointer(), "c:/BEST_700M_60AC_FAULT.bin.vtu", dataRange);
+
+  cout << "Grid has " << grid->GetNumberOfCells() << " cells and "
+    << grid->GetNumberOfPoints() << " pts "<< endl;
+
+  vtkPolyData* pd = 0;
     {
-    cout << i << ": " << np[i] << endl;
-    }
-  grid2->GetCellPoints(2, nn, np);
-  for (int i = 0; i < nn; i++)
-    {
-    cout << i << ": " << np[i] << endl;
+    vtkNew<vtkDataSetSurfaceFilter> surface;
+    surface->SetInputData(grid.GetPointer());
+    surface->Update();
+    pd = surface->GetOutput();
+    cout << "Geometry has " << pd->GetNumberOfCells() << " cells and "
+      << pd->GetNumberOfPoints() << " points "<< endl;
+    vtkNew<vtkCleanPolyData> clean;
+    clean->SetInputData(pd);
+    clean->Update();
+    pd = clean->GetOutput();
+    pd->Register(0);
     }
 
-  vtkNew<vtkDataSetSurfaceFilter> surface;
-  surface->SetInputData(grid2.GetPointer());
-  surface->Update();
+  cout << "Geometry has " << pd->GetNumberOfCells() << " cells and "
+    << pd->GetNumberOfPoints() << " points "<< endl;
+  pd->PrintSelf(cout, vtkIndent());
 
+  slice->SetInputData(grid.GetPointer());
   vtkNew<vtkDataSetSurfaceFilter> slsurface;
   slsurface->SetInputConnection(slice->GetOutputPort(0));
-  slsurface->Update();
-
 
   // Rendering pipeline
-  renWin->AddRenderer(renderer.GetPointer());
-  vtkNew<vtkRenderWindowInteractor> iren;
-  iren->SetRenderWindow(renWin.GetPointer());
-
   vtkNew<vtkPolyDataMapper> mapper;
-  mapper->SetInputConnection(0, surface->GetOutputPort(0));
-  mapper->SetScalarRange(porrange); //0, sk);
+  mapper->SetInputData(pd);
+  mapper->SetScalarRange(dataRange);
 
-  vtkNew<vtkActor> actor;
-  actor->SetMapper(mapper.GetPointer());
-  renderer->AddActor(actor.GetPointer());
+  vtkNew<vtkQuadricLODActor> lodActor;
+  lodActor->SetMapper(mapper.GetPointer());
+  lodActor->StaticOn();
+  renderer->AddActor(lodActor.GetPointer());
 
   vtkNew<vtkPolyDataMapper> wmapper;
-  wmapper->SetInputConnection(0, surface->GetOutputPort(0));
+  wmapper->SetInputData(pd);
   wmapper->ScalarVisibilityOff();
 
   vtkNew<vtkActor> wactor;
   wactor->SetMapper(wmapper.GetPointer());
   wactor->GetProperty()->SetColor(0, 0, 0);
   wactor->GetProperty()->SetRepresentationToWireframe();
-  renderer->AddActor(wactor.GetPointer());
-
+  //wactor->SetScale(1,1,2);
+  //renderer->AddActor(wactor.GetPointer());
 
   vtkNew<vtkPolyDataMapper> slmapper;
   slmapper->SetInputConnection(0, slsurface->GetOutputPort(0));
-  slmapper->SetScalarRange(porrange);//0, sk);
-  cout <<  porrange[0] << " to " << porrange[1] <<endl;
+  slmapper->SetScalarRange(dataRange);
 
   vtkNew<vtkActor> slactor;
   slactor->SetMapper(slmapper.GetPointer());
-  slactor->SetPosition(0,0,25);
+  slactor->SetPosition(0, 0, 1500);
   renderer->AddActor(slactor.GetPointer());
 
   vtkNew<vtkPolyDataMapper> slwmapper;
@@ -321,16 +410,26 @@ int main(int argc, char* argv[])
 
   vtkNew<vtkActor> slwactor;
   slwactor->SetMapper(slwmapper.GetPointer());
-  slwactor->SetPosition(0,0,25);
+  slwactor->SetPosition(0, 0, 1500);
   slwactor->GetProperty()->SetColor(0, 0, 0);
   slwactor->GetProperty()->SetRepresentationToWireframe();
   renderer->AddActor(slwactor.GetPointer());
 
+  vtkNew<vtkAxesActor> axes;
+  axes->SetTotalLength(5000, 5000, 5000);
+  //renderer->AddActor(axes.GetPointer());
 
   // Standard testing code.
   //renWin->SetMultiSamples(0);
-  renderer->SetBackground(0.5, 0.5, 0.5);
+  renderer->SetBackground(1., 1., 1.);
+  renWin->AddRenderer(renderer.GetPointer());
   renWin->SetSize(900, 900);
+
+  vtkNew<vtkRenderWindowInteractor> iren;
+  iren->SetRenderWindow(renWin.GetPointer());
+  iren->SetDesiredUpdateRate(25.);
+  iren->SetStillUpdateRate(0.001);
+  renWin->SetDesiredUpdateRate(25.);
   renWin->Render();
 
   vtkNew<MytInteractorStyle> style;
