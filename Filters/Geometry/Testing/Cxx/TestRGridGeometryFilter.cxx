@@ -184,6 +184,8 @@ public:
   }
 };
 
+vtkStandardNewMacro(MytInteractorStyle);
+
 void CreateGrid(vtkRGrid* grid)
 {
   vtkNew<vtkPoints> pts;
@@ -298,39 +300,37 @@ void LoadGrid(vtkRGrid* grid2, const std::string& fname, double dataRange[2])
   grid2->SetPoints(ug->GetPoints());
   vtkIntArray* ijk =
     vtkIntArray::SafeDownCast(ug->GetCellData()->GetArray("IJK"));
-  vtkCellArray* ugcells = ug->GetCells();
-  ugcells->InitTraversal();
+    vtkFloatArray* porv =
+    vtkFloatArray::SafeDownCast(ug->GetCellData()->GetArray("PORV"));
 
-  vtkIdType npts, *apts, cid = 0;
+  vtkIdType len = ijk->GetNumberOfTuples();
+  vtkNew<vtkUnsignedCharArray> blanking2;
+  blanking2->SetName("blanking");
+  blanking2->SetNumberOfValues(len);
+
   int dims[3] = { 0, 0, 0 };
-  while(ugcells->GetNextCell(npts, apts))
+  dataRange[0] = VTK_DOUBLE_MAX;
+  dataRange[1] = VTK_DOUBLE_MIN;
+
+  for (int i = 0; i < len; i++)
     {
-    double* ijk_ = ijk->GetTuple3(cid);
+    double* ijk_ = ijk->GetTuple3(i);
     if (dims[0] < ijk_[0]) dims[0] = ijk_[0];
     if (dims[1] < ijk_[1]) dims[1] = ijk_[1];
     if (dims[2] < ijk_[2]) dims[2] = ijk_[2];
 
-    cid++;
-    }
-  dims[0]++; dims[1]++; dims[2]++;
-
-  vtkNew<vtkUnsignedCharArray> blanking2;
-  blanking2->SetName("blanking");
-  vtkIdType len = ijk->GetNumberOfTuples();
-  blanking2->SetNumberOfValues(len); //dims[0] * dims[1] * dims[2]);
-  vtkFloatArray* por = vtkFloatArray::SafeDownCast(ug->GetCellData()->GetArray("PORV"));
-  dataRange[0] = VTK_DOUBLE_MAX;
-  dataRange[1] = VTK_DOUBLE_MIN;
-  for (int i = 0; i < len; i++)
-    {
-    double v = por->GetValue(i);
+    double v = porv->GetValue(i);
     if (v != 0. && v < dataRange[0]) dataRange[0] = v;
     if (v != 0. && v > dataRange[1]) dataRange[1] = v;
+    /*if (v != 0)
+      {
+      v = (ijk_[0] == 5 || ijk_[0] == 12 || ijk_[1] == 4 || ijk_[1] == 8) ? 1 : 0;
+      }*/
     blanking2->SetValue(i, (v != 0.) ? 1 : 0);
     }
 
-  grid2->SetDimensions(dims[0], dims[1], dims[2]);
-  grid2->SetCells(ugcells);
+  grid2->SetDimensions(dims[0] + 1, dims[1] + 1, dims[2] + 1);
+  grid2->SetCells(ug->GetCells());
   grid2->GetCellData()->ShallowCopy(ug->GetCellData());
   grid2->GetPointData()->ShallowCopy(ug->GetPointData());
   grid2->GetCellData()->AddArray(blanking2.GetPointer());
@@ -338,15 +338,13 @@ void LoadGrid(vtkRGrid* grid2, const std::string& fname, double dataRange[2])
   grid2->GetCellData()->SetActiveScalars("PORV");
 }
 
-vtkStandardNewMacro(MytInteractorStyle);
-
-int TestRGridGeometryFilter(int argc, char* argv[])
+int TestRGridGeometryFilter(int, char*[])
 {
   double dataRange[2];
   vtkNew<vtkRGrid> grid;
   //CreateGrid(grid.GetPointer());
-  //LoadGrid(grid.GetPointer(), "c:/BRILLIG.bin.vtu", dataRange);
-  LoadGrid(grid.GetPointer(), "c:/BEST_700M_60AC_FAULT.bin.vtu", dataRange);
+  LoadGrid(grid.GetPointer(), "c:/BRILLIG_FAULT.bin.vtu", dataRange);
+  //LoadGrid(grid.GetPointer(), "c:/BEST_700M_60AC_FAULT.bin.vtu", dataRange);
 
   cout << "Grid has " << grid->GetNumberOfCells() << " cells and "
     << grid->GetNumberOfPoints() << " pts "<< endl;
@@ -366,9 +364,8 @@ int TestRGridGeometryFilter(int argc, char* argv[])
     pd->Register(0);
     }
 
-  cout << "Geometry has " << pd->GetNumberOfCells() << " cells and "
+  cout << "Cleaned geometry has " << pd->GetNumberOfCells() << " cells and "
     << pd->GetNumberOfPoints() << " points "<< endl;
-  pd->PrintSelf(cout, vtkIndent());
 
   slice->SetInputData(grid.GetPointer());
   vtkNew<vtkDataSetSurfaceFilter> slsurface;
@@ -381,6 +378,8 @@ int TestRGridGeometryFilter(int argc, char* argv[])
 
   vtkNew<vtkQuadricLODActor> lodActor;
   lodActor->SetMapper(mapper.GetPointer());
+  lodActor->SetDataConfigurationToXYZVolume();
+  lodActor->SetMaximumDisplayListSize(5000000);
   lodActor->StaticOn();
   renderer->AddActor(lodActor.GetPointer());
 
@@ -392,7 +391,6 @@ int TestRGridGeometryFilter(int argc, char* argv[])
   wactor->SetMapper(wmapper.GetPointer());
   wactor->GetProperty()->SetColor(0, 0, 0);
   wactor->GetProperty()->SetRepresentationToWireframe();
-  //wactor->SetScale(1,1,2);
   //renderer->AddActor(wactor.GetPointer());
 
   vtkNew<vtkPolyDataMapper> slmapper;
@@ -437,11 +435,12 @@ int TestRGridGeometryFilter(int argc, char* argv[])
   iren->SetRenderWindow(renWin.GetPointer());
   iren->Initialize();
   iren->Start();
-  //int retVal = vtkRegressionTestImage(renWin.GetPointer());
- // if ( retVal == vtkRegressionTester::DO_INTERACTOR)
+  /*int retVal = vtkRegressionTestImage(renWin.GetPointer());
+  if ( retVal == vtkRegressionTester::DO_INTERACTOR)
     {
-   // iren->Start();
+    iren->Start();
     }
+  return !retVal;*/
 
-  return EXIT_SUCCESS; //!retVal;
+  return EXIT_SUCCESS;
 }
