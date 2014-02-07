@@ -84,6 +84,10 @@ public:
   virtual vtkAxis* GetAxis(int axisIndex);
 
   // Description:
+  // Get the X position of plotIndex.
+  virtual float GetXPosition(int plotIndex);
+
+  // Description:
   // Get the number of axes in the current chart.
   virtual vtkIdType GetNumberOfAxes();
 

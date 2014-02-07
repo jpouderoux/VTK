@@ -38,7 +38,7 @@ int TestBoxPlot(int , char* [])
   view->GetScene()->AddItem(chart.GetPointer());
 
   // Creates a vtkPlotBox input table
-  // The vtkPlotBox object will display 4 (arbitrary) box plot
+  // The vtkPlotBox object will display 4 (arbitrary) box plots
   int numParam = 4;
   vtkNew<vtkTable> inputBoxPlotTable;
 

@@ -45,7 +45,7 @@
 #include <algorithm>
 
 class vtkPlotBox::Private :
-    public std::vector< std::vector<double> >
+  public std::vector< std::vector<double> >
 {
 public:
   Private()
@@ -123,7 +123,8 @@ bool vtkPlotBox::Paint(vtkContext2D *painter)
     this->GetInput()->GetRowData()->GetAbstractArray(colName.c_str(), index);
     double rgb[4];
     this->LookupTable->GetIndexedColor(index, rgb);
-    unsigned char crgba[4] = { rgb[0] * 255., rgb[1] * 255, rgb[2] * 255, 255 };
+    unsigned char crgba[4] =
+      { rgb[0] * 255., rgb[1] * 255, rgb[2] * 255, 255 };
 
     if (parent->GetSelectedColumn() == i)
       {
@@ -131,14 +132,16 @@ bool vtkPlotBox::Paint(vtkContext2D *painter)
       crgba[1] = crgba[1]^255;
       crgba[2] = crgba[2]^255;
       }
-    DrawBoxPlot(i, crgba, parent->GetAxis(int(i))->GetPoint1()[0], painter);
+    this->DrawBoxPlot(i, crgba,
+      parent->GetXPosition(i), painter);
     }
 
   return true;
 }
 
 //-----------------------------------------------------------------------------
-void vtkPlotBox::DrawBoxPlot(int i, unsigned char *rgba, double x, vtkContext2D *painter)
+void vtkPlotBox::DrawBoxPlot(int i, unsigned char *rgba, double x,
+                             vtkContext2D *painter)
 {
   vtkNew<vtkBrush> brush;
   brush->SetColor(rgba);

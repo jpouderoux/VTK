@@ -63,9 +63,9 @@ public:
     }
   vtkSmartPointer<vtkPlotBox> Plot;
   std::vector<vtkAxis *> Axes;
+  std::vector<float> XPosition;
   vtkNew<vtkTransform2D> Transform;
   vtkNew<vtkAxis> YAxis;
-  vtkNew<vtkPlotGrid> Grid;
 };
 
 //-----------------------------------------------------------------------------
@@ -127,6 +127,7 @@ void vtkChartBox::Update()
       (*it)->Delete();
       }
     this->Storage->Axes.clear();
+    this->Storage->XPosition.clear();
 
     for (int i = 0; i < nbCols; ++i)
       {
@@ -169,6 +170,7 @@ void vtkChartBox::Update()
       axis->SetMinimum(grange[0]);
       axis->SetMaximum(grange[1]);
       }
+    this->Storage->XPosition.push_back(i);
     axis->SetTitle(this->VisibleColumns->GetValue(i));
     }
   this->Storage->YAxis->SetMinimum(grange[0]);
@@ -341,6 +343,19 @@ vtkAxis* vtkChartBox::GetAxis(int index)
 }
 
 //-----------------------------------------------------------------------------
+float vtkChartBox::GetXPosition(int index)
+{
+  if (index < this->Storage->XPosition.size())
+    {
+    return this->Storage->XPosition[index];
+    }
+  else
+    {
+    return 0.f;
+    }
+}
+
+//-----------------------------------------------------------------------------
 vtkIdType vtkChartBox::GetNumberOfAxes()
 {
   return this->Storage->Axes.size();
@@ -367,6 +382,7 @@ void vtkChartBox::UpdateGeometry()
     for (size_t i = 0; i < this->Storage->Axes.size(); ++i)
       {
       vtkAxis* axis = this->Storage->Axes[i];
+      this->Storage->XPosition[i] = x;
       axis->SetPoint1(x, this->Point1[1]);
       axis->SetPoint2(x, this->Point2[1]);
       if (axis->GetBehavior() == 0)
@@ -459,6 +475,7 @@ bool vtkChartBox::MouseMoveEvent(const vtkContextMouseEvent &mouse)
     // Move the axis in x
     float deltaX = mouse.GetScenePos().GetX() - mouse.GetLastScenePos().GetX();
 
+    this->Storage->XPosition[this->SelectedColumn] +=  deltaX;
     axis->SetPoint1(axis->GetPoint1()[0]+deltaX, axis->GetPoint1()[1]);
     axis->SetPoint2(axis->GetPoint2()[0]+deltaX, axis->GetPoint2()[1]);
 
