@@ -173,26 +173,6 @@ void vtkHighestDensityRegionsStatistics::Learn(vtkTable* inData,
     outObservations->SetName(ss.str().c_str());
     outputColumns->AddColumn(outObservations);
 
-    if (sum != 0.0)
-      {
-      sum = 1.0 / sum;
-
-      // Creation of the hdr array.
-      vtkNew<vtkDoubleArray> normalizedHDR;
-      std::stringstream sst;
-      sst << "Normalized " << outObservations->GetName();
-      normalizedHDR->SetName(sst.str().c_str());
-      normalizedHDR->SetNumberOfComponents(1);
-      vtkIdType nbObservations = outObservations->GetNumberOfTuples();
-      normalizedHDR->SetNumberOfTuples(nbObservations);
-      for (vtkIdType j = 0; j < nbObservations; j++)
-        {
-        normalizedHDR->SetTuple1(j, sum * outObservations->GetTuple1(j));
-        }
-
-      outputColumns->AddColumn(normalizedHDR.GetPointer());
-      }
-
     arrX->Delete();
     arrY->Delete();
     outObservations->Delete();

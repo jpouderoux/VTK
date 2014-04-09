@@ -21,6 +21,7 @@
 #include "vtkContext2D.h"
 #include "vtkContextMapper2D.h"
 #include "vtkDoubleArray.h"
+#include "vtkIdTypeArray.h"
 #include "vtkLookupTable.h"
 #include "vtkObjectFactory.h"
 #include "vtkPen.h"
@@ -221,6 +222,12 @@ bool vtkPlotFunctionalBag::Paint(vtkContext2D *painter)
     }
   else
     {
+    /*if (this->Selection)
+      {
+      vtkErrorMacro(<< "selection exists" << this->Selection->GetNumberOfTuples() << " : " <<
+        (this->Selection->GetNumberOfTuples() > 0 ? this->Selection->GetValue(0) : -1));
+      }*/
+
     this->Line->Paint(painter);
     }
 
