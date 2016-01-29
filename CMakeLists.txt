@@ -58,6 +58,24 @@ if(NOT VTK_IGNORE_CMAKE_CXX11_CHECKS)
   set(CMAKE_CXX_EXTENSIONS False)
 endif()
 
+# Initialize the global variables
+option(BUILD_ONE_LIBRARY "Build one library" OFF)
+if(BUILD_SHARED_LIBS AND BUILD_ONE_LIBRARY)
+  message("Cannot build shared libs and one library, turning BUILD_ONE_LIBRARY OFF")
+  set(BUILD_ONE_LIBRARY OFF)
+endif()
+
+set(BUILD_ONE_LIBRARY_BOOL 0)
+if(BUILD_ONE_LIBRARY)
+  set(ALL_LIBRARIES "" CACHE INTERNAL "Global libraries")
+   # Create a dummy.cxx empty file
+  file(WRITE ${CMAKE_BINARY_DIR}/dummy.cxx "")
+  add_library(VTK ${CMAKE_BINARY_DIR}/dummy.cxx)
+
+  cmake_policy(SET CMP0026 OLD)
+  get_target_property(VTK_ONE_LIBRARY VTK LOCATION)
+  set(BUILD_ONE_LIBRARY_BOOL 1)
+endif()
 
 # Objective-C++ compile flags.
 # CMake has no equivalent of CMAKE_CXX_FLAGS for Objective-C++ (bug #4756)
@@ -582,3 +600,22 @@ endif()
 #-----------------------------------------------------------------------------
 # Install the license file
 install(FILES ${VTK_SOURCE_DIR}/Copyright.txt DESTINATION ${VTK_INSTALL_DOC_DIR})
+
+# Create the full VTK Library
+if(BUILD_ONE_LIBRARY)
+  include(MergeStaticLibraries)
+
+  set(FULLLIBS ${ALL_LIBRARIES} vtksys)
+
+  # Get the location of the library
+  set(ALLLIBS)
+  foreach(lib ${FULLLIBS})
+    get_target_property(LibLocation ${lib} LOCATION)
+    list(APPEND ALLLIBS ${LibLocation})
+    add_dependencies(VTK ${lib})
+  endforeach()
+  merge_static_libraries(VTK ALL "${ALLLIBS}")
+
+  # Install the VTK library
+  vtk_target_install(VTK)
+endif()

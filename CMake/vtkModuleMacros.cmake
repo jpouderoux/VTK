@@ -448,29 +448,31 @@ function(vtk_target_export _name)
 endfunction()
 
 function(vtk_target_install _name)
-  if(NOT VTK_INSTALL_NO_LIBRARIES)
-    if(APPLE AND VTK_JAVA_INSTALL)
-       set_target_properties(${_name} PROPERTIES SUFFIX ".jnilib")
-    endif()
-    if(VTK_INSTALL_NO_DEVELOPMENT)
-      # Installation for deployment does not need static libraries.
-      get_property(_type TARGET ${_name} PROPERTY TYPE)
-      if(_type STREQUAL "STATIC_LIBRARY")
-        return()
+  if(NOT BUILD_ONE_LIBRARY OR (BUILD_ONE_LIBRARY AND (${_name} STREQUAL "VTK")))
+    if(NOT VTK_INSTALL_NO_LIBRARIES)
+      if(APPLE AND VTK_JAVA_INSTALL)
+         set_target_properties(${_name} PROPERTIES SUFFIX ".jnilib")
       endif()
-      set(_archive_destination "")
-    else()
-      # Installation for development needs static libraries.
-      set(_archive_destination
-        ARCHIVE DESTINATION ${VTK_INSTALL_ARCHIVE_DIR} COMPONENT Development
+      if(VTK_INSTALL_NO_DEVELOPMENT)
+        # Installation for deployment does not need static libraries.
+        get_property(_type TARGET ${_name} PROPERTY TYPE)
+        if(_type STREQUAL "STATIC_LIBRARY")
+          return()
+        endif()
+        set(_archive_destination "")
+      else()
+        # Installation for development needs static libraries.
+        set(_archive_destination
+          ARCHIVE DESTINATION ${VTK_INSTALL_ARCHIVE_DIR} COMPONENT Development
+          )
+      endif()
+      install(TARGETS ${_name}
+        EXPORT ${VTK_INSTALL_EXPORT_NAME}
+        RUNTIME DESTINATION ${VTK_INSTALL_RUNTIME_DIR} COMPONENT RuntimeLibraries
+        LIBRARY DESTINATION ${VTK_INSTALL_LIBRARY_DIR} COMPONENT RuntimeLibraries
+        ${_archive_destination}
         )
     endif()
-    install(TARGETS ${_name}
-      EXPORT ${VTK_INSTALL_EXPORT_NAME}
-      RUNTIME DESTINATION ${VTK_INSTALL_RUNTIME_DIR} COMPONENT RuntimeLibraries
-      LIBRARY DESTINATION ${VTK_INSTALL_LIBRARY_DIR} COMPONENT RuntimeLibraries
-      ${_archive_destination}
-      )
   endif()
 endfunction()
 
@@ -500,7 +502,7 @@ endfunction()
 
 #------------------------------------------------------------------------------
 function(vtk_compile_tools_target_install _name)
-  if(NOT VTK_INSTALL_NO_DEVELOPMENT)
+  if(NOT VTK_INSTALL_NO_DEVELOPMENT AND NOT BUILD_ONE_LIBRARY)
     install(TARGETS ${_name}
       EXPORT ${VTK_INSTALL_EXPORT_NAME}
       RUNTIME DESTINATION ${VTK_INSTALL_RUNTIME_DIR} COMPONENT RuntimeLibraries
@@ -545,6 +547,10 @@ endfunction()
 #------------------------------------------------------------------------------
 
 function(vtk_add_library name)
+  # Add the source files to the global variable
+  if(BUILD_ONE_LIBRARY)
+    set(ALL_LIBRARIES "${ALL_LIBRARIES};${name}" CACHE INTERNAL "Glolibraries")
+  endif()
   add_library(${name} ${ARGN} ${headers})
   # We use compile features to specify that VTK requires C++11
   # But at the same time don't have to be concerned about

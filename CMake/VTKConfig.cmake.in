@@ -120,6 +120,10 @@ endif()
 #  VTK_LIBRARY_DIRS    = Library search path (for outside dependencies)
 vtk_module_config(VTK ${VTK_MODULES_REQUESTED})
 
+if(@BUILD_ONE_LIBRARY_BOOL@)
+  set(VTK_LIBRARIES "@VTK_ONE_LIBRARY@")
+endif()
+
 #-----------------------------------------------------------------------------
 
 # VTK global configuration options.
